@@ -20,75 +20,31 @@ export const bounds = (init: Bounds | null = null): Bounds => {
 };
 
 export interface Rect {
+	left: number;
+	top: number;
 	width: number;
 	height: number;
 }
 
-export const rect = (init: Rect | null = null): Rect => {
+export const rect = (init: Partial<Rect> | null = null): Rect => {
 	if (init == null) {
-		return { width: 0, height: 0 };
+		return { top: 0, left: 0, width: 0, height: 0 };
 	} else {
-		const { width, height } = init;
-		return { width, height };
+		const { top, left, width, height } = init;
+		return {
+			left: left || 0,
+			top: top || 0,
+			width: width || 0,
+			height: height || 0,
+		};
 	}
 };
 
 export function boundsToRect(bounds: Bounds): Rect {
 	return {
+		left: bounds.minX,
+		top: bounds.minY,
 		width: bounds.maxX - bounds.minX,
 		height: bounds.maxY - bounds.minY,
 	};
 }
-
-export function aspectRatio(width: number, height: number): number;
-export function aspectRatio(rect: Rect): number;
-export function aspectRatio(bounds: Bounds): number;
-export function aspectRatio(a: number | Rect | Bounds, b?: number): number {
-	if (typeof a === "number" && typeof b === "number") {
-		return a / b;
-	}
-
-	const rect =
-		"maxX" in (a as object) ? boundsToRect(a as Bounds) : (a as Rect);
-
-	return rect.width / rect.height;
-}
-
-export const fitCameraIntoPlane = (
-	planeBounds: Bounds,
-	cameraRect: Rect,
-): [Bounds, number] => {
-	const planeRect = boundsToRect(planeBounds);
-	const planeAspect = aspectRatio(planeRect);
-	const cameraAspect = aspectRatio(cameraRect);
-
-	let cameraBounds: Bounds;
-	let unitPerPixel: number;
-
-	if (cameraAspect >= planeAspect) {
-		unitPerPixel = planeRect.width / cameraRect.width;
-
-		const cameraToPlaneHeight = unitPerPixel * cameraRect.height;
-		const complementaryPlane = planeRect.height - cameraToPlaneHeight;
-
-		cameraBounds = {
-			minX: planeBounds.minX,
-			maxX: planeBounds.maxX,
-			minY: planeBounds.minY + complementaryPlane / 2,
-			maxY: planeBounds.maxY - complementaryPlane / 2,
-		};
-	} else {
-		unitPerPixel = planeRect.height / cameraRect.height;
-		const cameraToPlaneWidth = unitPerPixel * cameraRect.width;
-		const complementaryPlane = planeRect.width - cameraToPlaneWidth;
-
-		cameraBounds = {
-			minY: planeBounds.minX + complementaryPlane / 2,
-			maxY: planeBounds.maxX - complementaryPlane / 2,
-			minX: planeBounds.minY,
-			maxX: planeBounds.maxY,
-		};
-	}
-
-	return [cameraBounds, unitPerPixel];
-};
