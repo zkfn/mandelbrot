@@ -31,6 +31,7 @@ class Tile {
 class WorldScaler {
 	private texelsResolution: number;
 	private dpr: number;
+	private zoomFactor = 0.001;
 
 	private maxUnitsPerPixel: number;
 	private minUnitsPerPixel: number;
@@ -119,16 +120,12 @@ class WorldScaler {
 		event.preventDefault();
 
 		const [px, py] = this.canvasToCameraPx(event.clientX, event.clientY);
-		const [ux, uy] = this.cameraCoordToPlane(px, py);
+		const [planeX, planeY] = this.cameraCoordToPlane(px, py);
+		const factor = 2 ** (this.zoomFactor * event.deltaY);
 
-		const scale = event.deltaY < 0 ? 1 / 1.1 : 1.1;
-		this.zoomAt(ux, uy, scale);
-	}
-
-	private zoomAt(planeX: number, planeY: number, scale: number) {
 		this.unitsPerPixel = clamp(
 			this.minUnitsPerPixel,
-			this.unitsPerPixel * scale,
+			this.unitsPerPixel * factor,
 			this.maxUnitsPerPixel,
 		);
 
@@ -258,7 +255,6 @@ class WorldScaler {
 		}
 
 		console.log(depthLevel);
-		console.dir(this);
 		return tiles;
 	}
 }
