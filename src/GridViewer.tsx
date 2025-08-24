@@ -44,7 +44,9 @@ class WorldScaler {
 	private isPanning = false;
 	private panLastXPixels = 0;
 	private panLastYPixels = 0;
+
 	private needsRedraw = false;
+	private canvas: HTMLCanvasElement;
 
 	constructor(planeBounds: Bounds, texelResolution: number = 256) {
 		this.texelsResolution = texelResolution;
@@ -58,10 +60,11 @@ class WorldScaler {
 
 		this.cameraRectPixels = rect();
 		this.cameraBoundsUnits = bounds();
+		this.canvas = null!;
 
 		this.unitsPerPixel = 0;
 		this.maxUnitsPerPixel = 0;
-		this.minUnitsPerPixel = 2 ** -62;
+		this.minUnitsPerPixel = 2 ** -58;
 	}
 
 	public initCanvas(canvas: HTMLCanvasElement) {
@@ -75,11 +78,12 @@ class WorldScaler {
 		window.addEventListener("mouseup", this.handleMouseUp);
 
 		this.needsRedraw = true;
+		this.canvas = canvas;
 	}
 
-	public deinitCanvas(canvas: HTMLCanvasElement) {
-		canvas.removeEventListener("wheel", this.handleWheel);
-		canvas.removeEventListener("mousedown", this.handleMouseDown);
+	public deinitCanvas() {
+		this.canvas.removeEventListener("wheel", this.handleWheel);
+		this.canvas.removeEventListener("mousedown", this.handleMouseDown);
 		window.removeEventListener("mousemove", this.handleMouseMove);
 		window.removeEventListener("mouseup", this.handleMouseUp);
 	}
@@ -137,6 +141,7 @@ class WorldScaler {
 
 		this.isPanning = true;
 		this.needsRedraw = true;
+		this.canvas.style.cursor = "grabbing";
 	};
 
 	public handleMouseMove = (event: MouseEvent) => {
@@ -170,6 +175,7 @@ class WorldScaler {
 	};
 
 	public handleMouseUp = () => {
+		this.canvas.style.cursor = "grab";
 		this.isPanning = false;
 	};
 
@@ -372,7 +378,7 @@ const GridViewer: FC<GridViewerProps> = ({ cplaneBounds }) => {
 		}
 
 		worldScaler.initCanvas(canvasRef.current);
-		return () => worldScaler.deinitCanvas(canvasRef.current);
+		return () => worldScaler.deinitCanvas();
 	}, []);
 
 	useEffect(() => {
