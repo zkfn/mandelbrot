@@ -19,6 +19,10 @@ export const bounds = (init: Bounds | null = null): Bounds => {
 	}
 };
 
+export const center = (bounds: Bounds): [number, number] => {
+	return [(bounds.minX + bounds.maxX) * 0.5, (bounds.minY + bounds.maxY) * 0.5];
+};
+
 export interface Rect {
 	left: number;
 	top: number;
@@ -40,11 +44,11 @@ export const rect = (init: Partial<Rect> | null = null): Rect => {
 	}
 };
 
-export function boundsToRect(bounds: Bounds): Rect {
-	return {
-		left: bounds.minX,
-		top: bounds.minY,
-		width: bounds.maxX - bounds.minX,
-		height: bounds.maxY - bounds.minY,
-	};
-}
+// export function boundsToRect(bounds: Bounds): Rect {
+// 	return {
+// 		left: bounds.minX,
+// 		top: bounds.minY,
+// 		width: bounds.maxX - bounds.minX,
+// 		height: bounds.maxY - bounds.minY,
+// 	};
+// }

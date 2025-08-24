@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type FC } from "react";
-import { bounds, rect, type Bounds, type Rect } from "./bounds";
+import { bounds, center, rect, type Bounds, type Rect } from "./bounds";
 import { clamp } from "./utils";
 
 interface GridViewerProps {
@@ -47,6 +47,7 @@ class WorldScaler {
 
 	private needsRedraw = false;
 	private canvas: HTMLCanvasElement;
+	private resizeObserver: ResizeObserver;
 
 	constructor(planeBounds: Bounds, texelResolution: number = 256) {
 		this.texelsResolution = texelResolution;
@@ -60,7 +61,9 @@ class WorldScaler {
 
 		this.cameraRectPixels = rect();
 		this.cameraBoundsUnits = bounds();
+
 		this.canvas = null!;
+		this.resizeObserver = null!;
 
 		this.unitsPerPixel = 0;
 		this.maxUnitsPerPixel = 0;
@@ -76,9 +79,13 @@ class WorldScaler {
 		canvas.addEventListener("mousedown", this.handleMouseDown);
 		window.addEventListener("mousemove", this.handleMouseMove);
 		window.addEventListener("mouseup", this.handleMouseUp);
+		window.addEventListener("resize", this.handleResize);
 
 		this.needsRedraw = true;
 		this.canvas = canvas;
+
+		this.resizeObserver = new ResizeObserver(this.handleResize);
+		this.resizeObserver.observe(this.canvas);
 	}
 
 	public deinitCanvas() {
@@ -86,6 +93,8 @@ class WorldScaler {
 		this.canvas.removeEventListener("mousedown", this.handleMouseDown);
 		window.removeEventListener("mousemove", this.handleMouseMove);
 		window.removeEventListener("mouseup", this.handleMouseUp);
+		window.removeEventListener("resize", this.handleResize);
+		this.resizeObserver.disconnect();
 	}
 
 	public adaptCameraToCanvas(canvas: HTMLCanvasElement) {
@@ -117,8 +126,7 @@ class WorldScaler {
 		const spanX = this.unitsPerPixel * this.cameraRectPixels.width;
 		const spanY = this.unitsPerPixel * this.cameraRectPixels.height;
 
-		const cx = (this.planeBoundsUnits.minX + this.planeBoundsUnits.maxX) * 0.5;
-		const cy = (this.planeBoundsUnits.minY + this.planeBoundsUnits.maxY) * 0.5;
+		const [cx, cy] = center(this.planeBoundsUnits);
 
 		this.cameraBoundsUnits = {
 			minX: cx - spanX * 0.5,
@@ -214,6 +222,33 @@ class WorldScaler {
 			maxX: planeX + maxX,
 			minY: planeY - minY,
 			maxY: planeY + maxY,
+		};
+
+		this.clampToOuterPlane();
+		this.needsRedraw = true;
+	};
+
+	public handleResize = () => {
+		const [cx, cy] = center(this.cameraBoundsUnits);
+		const oldUPP = this.unitsPerPixel;
+
+		this.adaptCameraToCanvas(this.canvas);
+		this.adaptMaxUnitPerPixel();
+
+		this.unitsPerPixel = clamp(
+			this.minUnitsPerPixel,
+			oldUPP,
+			this.maxUnitsPerPixel,
+		);
+
+		const spanX = this.unitsPerPixel * this.cameraRectPixels.width;
+		const spanY = this.unitsPerPixel * this.cameraRectPixels.height;
+
+		this.cameraBoundsUnits = {
+			minX: cx - spanX * 0.5,
+			maxX: cx + spanX * 0.5,
+			minY: cy - spanY * 0.5,
+			maxY: cy + spanY * 0.5,
 		};
 
 		this.clampToOuterPlane();
