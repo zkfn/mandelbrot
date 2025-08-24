@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type FC } from "react";
-import { bounds, boundsToRect, rect, type Bounds, type Rect } from "./bounds";
+import { bounds, rect, type Bounds, type Rect } from "./bounds";
 import { clamp } from "./utils";
 
 interface GridViewerProps {
@@ -30,35 +30,33 @@ class Tile {
  */
 class WorldScaler {
 	private texelsResolution: number;
-	private dpr: number;
 	private zoomFactor = 0.001;
+	private dpr: number;
 
 	private maxUnitsPerPixel: number;
 	private minUnitsPerPixel: number;
 	private unitsPerPixel: number;
 
-	private cameraRectUnits: Rect;
-	private cameraRectPx: Rect;
-	private canvasRectPx: Rect;
-
+	private cameraRectPixels: Rect;
 	private cameraBoundsUnits: Bounds;
 	private planeBoundsUnits: Bounds;
-	private planeRectUnits: Rect;
+
+	private isPanning = false;
+	private panLastXPixels = 0;
+	private panLastYPixels = 0;
+	private needsRedraw = false;
 
 	constructor(planeBounds: Bounds, texelResolution: number = 256) {
 		this.texelsResolution = texelResolution;
 		this.dpr = window.devicePixelRatio || 1;
 
 		this.planeBoundsUnits = bounds(planeBounds);
-		this.planeRectUnits = boundsToRect(planeBounds);
 
-		if (this.planeRectUnits.width != this.planeRectUnits.height) {
+		if (this.planeWidthUnits() != this.planeHeightUnits()) {
 			throw new Error("Plane bounds need to form a square.");
 		}
 
-		this.canvasRectPx = rect();
-		this.cameraRectPx = rect();
-		this.cameraRectUnits = rect();
+		this.cameraRectPixels = rect();
 		this.cameraBoundsUnits = bounds();
 
 		this.unitsPerPixel = 0;
@@ -70,6 +68,20 @@ class WorldScaler {
 		this.adaptCameraToCanvas(canvas);
 		this.adaptMaxUnitPerPixel();
 		this.upscaleAndCenter();
+
+		canvas.addEventListener("wheel", this.handleWheel, { passive: true });
+		canvas.addEventListener("mousedown", this.handleMouseDown);
+		window.addEventListener("mousemove", this.handleMouseMove);
+		window.addEventListener("mouseup", this.handleMouseUp);
+
+		this.needsRedraw = true;
+	}
+
+	public deinitCanvas(canvas: HTMLCanvasElement) {
+		canvas.removeEventListener("wheel", this.handleWheel);
+		canvas.removeEventListener("mousedown", this.handleMouseDown);
+		window.removeEventListener("mousemove", this.handleMouseMove);
+		window.removeEventListener("mouseup", this.handleMouseUp);
 	}
 
 	public adaptCameraToCanvas(canvas: HTMLCanvasElement) {
@@ -81,27 +93,25 @@ class WorldScaler {
 		canvas.width = cameraWidth;
 		canvas.height = cameraHeight;
 
-		this.canvasRectPx = rect(bounding);
-		this.cameraRectPx = {
-			left: 0,
-			top: 0,
+		this.cameraRectPixels = {
+			left: bounding.left,
+			top: bounding.top,
 			width: cameraWidth,
 			height: cameraHeight,
 		};
 	}
 
 	private adaptMaxUnitPerPixel() {
-		const horizontalPPU = this.planeRectUnits.width / this.cameraRectPx.width;
-		const verticalPPU = this.planeRectUnits.height / this.cameraRectPx.height;
-
+		const horizontalPPU = this.planeWidthUnits() / this.cameraRectPixels.width;
+		const verticalPPU = this.planeHeightUnits() / this.cameraRectPixels.height;
 		this.maxUnitsPerPixel = Math.max(horizontalPPU, verticalPPU);
 	}
 
 	private upscaleAndCenter() {
 		this.unitsPerPixel = this.maxUnitsPerPixel;
 
-		const spanX = this.unitsPerPixel * this.cameraRectPx.width;
-		const spanY = this.unitsPerPixel * this.cameraRectPx.height;
+		const spanX = this.unitsPerPixel * this.cameraRectPixels.width;
+		const spanY = this.unitsPerPixel * this.cameraRectPixels.height;
 
 		const cx = (this.planeBoundsUnits.minX + this.planeBoundsUnits.maxX) * 0.5;
 		const cy = (this.planeBoundsUnits.minY + this.planeBoundsUnits.maxY) * 0.5;
@@ -112,13 +122,58 @@ class WorldScaler {
 			minY: cy - spanY * 0.5,
 			maxY: cy + spanY * 0.5,
 		};
-
-		this.cameraRectUnits = boundsToRect(this.cameraBoundsUnits);
 	}
 
-	public handleWheel(event: WheelEvent) {
+	public handleMouseDown = (event: MouseEvent) => {
 		event.preventDefault();
 
+		const [planeX, planeY] = this.canvasToCameraPx(
+			event.clientX,
+			event.clientY,
+		);
+
+		this.panLastXPixels = planeX;
+		this.panLastYPixels = planeY;
+
+		this.isPanning = true;
+		this.needsRedraw = true;
+	};
+
+	public handleMouseMove = (event: MouseEvent) => {
+		event.preventDefault();
+
+		if (!this.isPanning) return;
+
+		const [planeX, planeY] = this.canvasToCameraPx(
+			event.clientX,
+			event.clientY,
+		);
+
+		const dxPixels = planeX - this.panLastXPixels;
+		const dyPixels = planeY - this.panLastYPixels;
+
+		this.panLastXPixels = planeX;
+		this.panLastYPixels = planeY;
+
+		const dxUnits = dxPixels * this.unitsPerPixel;
+		const dyUnits = dyPixels * this.unitsPerPixel;
+
+		this.cameraBoundsUnits = {
+			minX: this.cameraBoundsUnits.minX - dxUnits,
+			maxX: this.cameraBoundsUnits.maxX - dxUnits,
+			minY: this.cameraBoundsUnits.minY - dyUnits,
+			maxY: this.cameraBoundsUnits.maxY - dyUnits,
+		};
+
+		this.clampToOuterPlane();
+		this.needsRedraw = true;
+	};
+
+	public handleMouseUp = () => {
+		this.isPanning = false;
+	};
+
+	public handleWheel = (event: WheelEvent) => {
 		const [px, py] = this.canvasToCameraPx(event.clientX, event.clientY);
 		const [planeX, planeY] = this.cameraCoordToPlane(px, py);
 		const factor = 2 ** (this.zoomFactor * event.deltaY);
@@ -129,13 +184,18 @@ class WorldScaler {
 			this.maxUnitsPerPixel,
 		);
 
-		const newWidthUnits = this.unitsPerPixel * this.cameraRectPx.width;
-		const newHeightUnits = this.unitsPerPixel * this.cameraRectPx.height;
+		const newWidthUnits = this.unitsPerPixel * this.cameraRectPixels.width;
+		const newHeightUnits = this.unitsPerPixel * this.cameraRectPixels.height;
+
+		const cameraWidthUnits =
+			this.cameraBoundsUnits.maxX - this.cameraBoundsUnits.minX;
+		const cameraHeightUnits =
+			this.cameraBoundsUnits.maxY - this.cameraBoundsUnits.minY;
 
 		const cursorHorizontalProportion =
-			(planeX - this.cameraRectUnits.left) / this.cameraRectUnits.width;
+			(planeX - this.cameraBoundsUnits.minX) / cameraWidthUnits;
 		const cursorVerticalProportion =
-			(planeY - this.cameraRectUnits.top) / this.cameraRectUnits.height;
+			(planeY - this.cameraBoundsUnits.minY) / cameraHeightUnits;
 
 		const minX = newWidthUnits * cursorHorizontalProportion;
 		const minY = newHeightUnits * cursorVerticalProportion;
@@ -150,50 +210,80 @@ class WorldScaler {
 			maxY: planeY + maxY,
 		};
 
-		this.cameraRectUnits = boundsToRect(this.cameraBoundsUnits);
 		this.clampToOuterPlane();
-	}
+		this.needsRedraw = true;
+	};
 
 	private clampToOuterPlane() {
 		let { minX, minY } = this.cameraBoundsUnits;
 
-		if (this.cameraRectUnits.width > this.planeRectUnits.width) {
-			minX =
-				this.planeBoundsUnits.minX -
-				(this.cameraRectUnits.width - this.planeRectUnits.width) / 2;
+		const width = this.cameraWidthUnits();
+		const height = this.cameraHeightUnits();
+
+		if (width > this.planeWidthUnits()) {
+			const halfOverreach = (width - this.planeWidthUnits()) / 2;
+			minX = this.planeBoundsUnits.minX - halfOverreach;
 		} else {
-			const maxMinX = this.planeBoundsUnits.maxX - this.cameraRectUnits.width;
+			const maxMinX = this.planeBoundsUnits.maxX - width;
 			if (minX < this.planeBoundsUnits.minX) minX = this.planeBoundsUnits.minX;
 			if (minX > maxMinX) minX = maxMinX;
 		}
 
-		if (this.cameraRectUnits.height > this.planeRectUnits.height) {
-			minY =
-				this.planeBoundsUnits.minY -
-				(this.cameraRectUnits.height - this.planeRectUnits.height) / 2;
+		if (height > this.planeHeightUnits()) {
+			const halfOverreach = (height - this.planeHeightUnits()) / 2;
+			minY = this.planeBoundsUnits.minY - halfOverreach;
 		} else {
-			const maxMinY = this.planeBoundsUnits.maxY - this.cameraRectUnits.height;
+			const maxMinY = this.planeBoundsUnits.maxY - height;
 			if (minY < this.planeBoundsUnits.minY) minY = this.planeBoundsUnits.minY;
 			if (minY > maxMinY) minY = maxMinY;
 		}
 
 		this.cameraBoundsUnits = {
 			minX,
-			maxX: minX + this.cameraRectUnits.width,
+			maxX: minX + width,
 			minY,
-			maxY: minY + this.cameraRectUnits.height,
+			maxY: minY + height,
 		};
+	}
 
-		this.cameraRectUnits = boundsToRect(this.cameraBoundsUnits);
+	public tiles(): Tile[] {
+		const tiles: Tile[] = [];
+
+		const depthLevel = this.getSplitDepthLevel();
+		const tileWidthUnits = this.tileUnitSizeFromDepthLevel(depthLevel);
+		const tileWidthPx = tileWidthUnits / this.unitsPerPixel;
+
+		const minXUnits = Math.floor(this.cameraBoundsUnits.minX / tileWidthUnits);
+		const minYUnits = Math.floor(this.cameraBoundsUnits.minY / tileWidthUnits);
+
+		const xmin = this.planeXToCamera(minXUnits * tileWidthUnits);
+		const ymin = this.planeYToCamera(minYUnits * tileWidthUnits);
+
+		const xmax = this.cameraRectPixels.width;
+		const ymax = this.cameraRectPixels.height;
+
+		for (let yPx = ymin; yPx < ymax; yPx += tileWidthPx) {
+			for (let xPx = xmin; xPx < xmax; xPx += tileWidthPx) {
+				tiles.push(new Tile(xPx, yPx, tileWidthPx));
+			}
+		}
+
+		return tiles;
 	}
 
 	private canvasToCameraPx(clX: number, clY: number): [number, number] {
-		const { top, left } = this.canvasRectPx;
+		const { top, left } = this.cameraRectPixels;
 
 		const px = (clX - left) * this.dpr;
 		const py = (clY - top) * this.dpr;
 
 		return [px, py];
+	}
+
+	public readAndClearDrawFlag(): boolean {
+		const previous = this.needsRedraw;
+		this.needsRedraw = false;
+		return previous;
 	}
 
 	public cameraCoordToPlane(x: number, y: number): [number, number] {
@@ -223,45 +313,34 @@ class WorldScaler {
 	private getSplitDepthLevel(): number {
 		return Math.ceil(
 			Math.log2(
-				this.planeRectUnits.width /
-					(this.unitsPerPixel * this.texelsResolution),
+				this.planeWidthUnits() / (this.unitsPerPixel * this.texelsResolution),
 			),
 		);
 	}
 
 	private tileUnitSizeFromDepthLevel(depthLevel: number): number {
-		return this.planeRectUnits.width / Math.pow(2, depthLevel);
+		return this.planeWidthUnits() / Math.pow(2, depthLevel);
 	}
 
-	public tiles(): Tile[] {
-		const tiles: Tile[] = [];
-		const depthLevel = this.getSplitDepthLevel();
-		const tileWidthUnits = this.tileUnitSizeFromDepthLevel(depthLevel);
-		const tileWidthPx = tileWidthUnits / this.unitsPerPixel;
+	private cameraWidthUnits() {
+		return this.cameraBoundsUnits.maxX - this.cameraBoundsUnits.minX;
+	}
 
-		const minXUnits = Math.floor(this.cameraBoundsUnits.minX / tileWidthUnits);
-		const minYUnits = Math.floor(this.cameraBoundsUnits.minY / tileWidthUnits);
+	private cameraHeightUnits() {
+		return this.cameraBoundsUnits.maxY - this.cameraBoundsUnits.minY;
+	}
 
-		const xmin = this.planeXToCamera(minXUnits * tileWidthUnits);
-		const ymin = this.planeYToCamera(minYUnits * tileWidthUnits);
+	private planeWidthUnits() {
+		return this.planeBoundsUnits.maxX - this.planeBoundsUnits.minX;
+	}
 
-		const xmax = this.cameraRectPx.width;
-		const ymax = this.cameraRectPx.height;
-
-		for (let yPx = ymin; yPx < ymax; yPx += tileWidthPx) {
-			for (let xPx = xmin; xPx < xmax; xPx += tileWidthPx) {
-				tiles.push(new Tile(xPx, yPx, tileWidthPx));
-			}
-		}
-
-		console.log(depthLevel);
-		return tiles;
+	private planeHeightUnits() {
+		return this.planeBoundsUnits.maxY - this.planeBoundsUnits.minY;
 	}
 }
 
 const GridViewer: FC<GridViewerProps> = ({ cplaneBounds }) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null!);
-	const needDraw = useRef(false);
 	const worldScaler = new WorldScaler(cplaneBounds);
 
 	function draw() {
@@ -293,22 +372,13 @@ const GridViewer: FC<GridViewerProps> = ({ cplaneBounds }) => {
 		}
 
 		worldScaler.initCanvas(canvasRef.current);
-		canvasRef.current.addEventListener(
-			"wheel",
-			(e) => {
-				worldScaler.handleWheel(e);
-				needDraw.current = true;
-			},
-			// { passive: true },
-		);
-		needDraw.current = true;
+		return () => worldScaler.deinitCanvas(canvasRef.current);
 	}, []);
 
 	useEffect(() => {
 		function tick() {
-			if (needDraw.current) {
+			if (worldScaler.readAndClearDrawFlag()) {
 				draw();
-				needDraw.current = false;
 			}
 			requestAnimationFrame(tick);
 		}
