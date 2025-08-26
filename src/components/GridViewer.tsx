@@ -1,9 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type FC } from "react";
 import { boundsToRect } from "@common/utils";
 import { ReadAndClearFlag } from "@common/flag";
-import { Tile, TileSetter } from "@lib/tiles";
+import { Tile, TileSetter, TileState } from "@lib/tiles";
 import { PlaneGrid } from "@lib/grid";
 import type { Plane } from "@common/types";
+import { TileStore } from "@lib/store";
+import { TileJobQueue } from "@lib/queue";
+import { WorkerExecutor } from "@lib/executor";
 
 interface GridViewerProps {
 	plane: Plane;
@@ -14,6 +17,9 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 	const tileSetter = useMemo(() => new TileSetter(plane), [plane]);
 	const dirtyFlagRef = useRef<ReadAndClearFlag>(new ReadAndClearFlag(true));
 	const planeGridRef = useRef<PlaneGrid>(null!);
+	const tileStore = useRef<TileStore>(null!);
+	const tileQueue = useRef<TileJobQueue>(null!);
+	const executor = useRef<WorkerExecutor>(null!);
 	const rafNumber = useRef<number>(0);
 
 	const assertDirtyFlag = (): ReadAndClearFlag => {
@@ -59,27 +65,66 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 		const [canvas, ctx] = assertAndGetCanvasWithCtx();
 		const camera = planeGrid.getCameraBounds();
 
-		const desiredDepth = planeGrid.optimalDepthLevelPerResolution(256);
-
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 		ctx.fillStyle = "#fff";
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
 		ctx.strokeStyle = "#000";
 		ctx.lineWidth = 1;
 
+		function colorFor(state: TileState): string {
+			if (state === TileState.READY) return "#0f0";
+			if (state === TileState.RENDERING) return "#ff4";
+			else return "#aa0";
+		}
+
 		const paintTiles = (tiles: Tile[]) => {
 			for (const tile of tiles) {
 				const camBounds = planeGrid.planeBoundsToCamera(tile.section);
+
 				const { minX, minY } = camBounds;
 				const { width, height } = boundsToRect(camBounds);
 
-				ctx.fillStyle = "#fff";
-				ctx.fillRect(minX, minY, width, height);
-				ctx.strokeRect(minX, minY, width, height);
+				const record = tileStore.current.getTileRecord(tile.key.id());
+
+				if (record && record.state != TileState.QUEUED) {
+					ctx.fillStyle = colorFor(record.state);
+					ctx.fillRect(minX, minY, width, height);
+					ctx.strokeRect(minX, minY, width, height);
+				}
 			}
 		};
 
-		paintTiles(tileSetter.layTiles(camera, desiredDepth));
+		const processTiles = (tiles: Tile[]) => {
+			for (const tile of tiles) {
+				const record = tileStore.current.getTileRecord(tile.key.id());
+
+				if (!record || record.state == TileState.QUEUED) {
+					tileQueue.current.push(tile);
+					tileStore.current.setQueued(tile.key.id());
+				}
+			}
+		};
+
+		const desiredDepth = planeGrid.optimalDepthLevelPerResolution(256);
+		const coarserDepth = desiredDepth - 1;
+		const blurDepth = desiredDepth - 2;
+
+		const desiredTiles = tileSetter.layTiles(camera, desiredDepth);
+		const coarserTiles = tileSetter.layTiles(camera, coarserDepth);
+		const blurTiles = tileSetter.layTiles(camera, blurDepth);
+
+		tileQueue.current.nextGeneration();
+
+		processTiles(blurTiles);
+		processTiles(coarserTiles);
+		processTiles(desiredTiles);
+
+		tileStore.current.prune();
+		executor.current.pump();
+
+		paintTiles(blurTiles);
+		paintTiles(coarserTiles);
+		paintTiles(desiredTiles);
 	}
 
 	useLayoutEffect(() => {
@@ -87,13 +132,23 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 		const canvas = assertCanvas();
 
 		const planeGrid = new PlaneGrid(plane, dirtyFlag);
-		planeGrid.initCanvas(canvas);
 
+		planeGrid.initCanvas(canvas);
 		planeGridRef.current = planeGrid;
+
+		tileQueue.current = new TileJobQueue();
+		tileStore.current = new TileStore();
+		executor.current = new WorkerExecutor(
+			tileStore.current,
+			tileQueue.current,
+			dirtyFlag,
+		);
 
 		return () => {
 			planeGrid.deinitCanvas();
+
 			planeGridRef.current = null!;
+			// TODO: Deinit the queue and stuff;
 		};
 	}, [plane]);
 
