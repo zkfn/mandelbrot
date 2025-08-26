@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type FC } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, type FC } from "react";
 import { boundsToRect } from "@common/utils";
 import { ReadAndClearFlag } from "@common/flag";
 import { Tile, TileSetter } from "@lib/tiles";
@@ -11,26 +11,59 @@ interface GridViewerProps {
 
 const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null!);
+	const tileSetter = useMemo(() => new TileSetter(plane), [plane]);
+	const dirtyFlagRef = useRef<ReadAndClearFlag>(new ReadAndClearFlag(true));
+	const planeGridRef = useRef<PlaneGrid>(null!);
+	const rafNumber = useRef<number>(0);
 
-	const dirtyFlag = new ReadAndClearFlag(true);
-	const planeGrid = new PlaneGrid(plane, dirtyFlag);
-	const tileSetter = new TileSetter(plane);
+	const assertDirtyFlag = (): ReadAndClearFlag => {
+		if (!dirtyFlagRef.current) {
+			throw Error("Dirty flag ref is empty.");
+		}
+
+		return dirtyFlagRef.current;
+	};
+
+	const assertAndGetPlaneGrid = (): PlaneGrid => {
+		if (!planeGridRef.current) {
+			throw Error("Plane grid ref is empty.");
+		}
+
+		return planeGridRef.current;
+	};
+
+	const assertCanvas = (): HTMLCanvasElement => {
+		if (!canvasRef.current) {
+			throw Error("Canvas ref is empty.");
+		}
+
+		return canvasRef.current;
+	};
+
+	const assertAndGetCanvasWithCtx = (): [
+		HTMLCanvasElement,
+		CanvasRenderingContext2D,
+	] => {
+		const canvas = assertCanvas();
+		const ctx = canvas.getContext("2d");
+
+		if (!ctx) {
+			throw Error("Canvas context is empty.");
+		}
+
+		return [canvas, ctx];
+	};
 
 	function draw() {
-		const canvas = canvasRef.current;
-		if (!canvas) return;
-		const ctx = canvas.getContext("2d");
-		if (!ctx) return;
-
+		const planeGrid = assertAndGetPlaneGrid();
+		const [canvas, ctx] = assertAndGetCanvasWithCtx();
 		const camera = planeGrid.getCameraBounds();
-		const W = canvas.width;
-		const H = canvas.height;
 
 		const desiredDepth = planeGrid.optimalDepthLevelPerResolution(256);
 
-		ctx.clearRect(0, 0, W, H);
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
 		ctx.fillStyle = "#fff";
-		ctx.fillRect(0, 0, W, H);
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
 		ctx.strokeStyle = "#000";
 		ctx.lineWidth = 1;
 
@@ -50,23 +83,29 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 	}
 
 	useLayoutEffect(() => {
-		if (!canvasRef.current) {
-			throw new Error("Canvas current is not set.");
-		}
+		const dirtyFlag = assertDirtyFlag();
+		const canvas = assertCanvas();
 
-		planeGrid.initCanvas(canvasRef.current);
-		return () => planeGrid.deinitCanvas();
-	}, []);
+		const planeGrid = new PlaneGrid(plane, dirtyFlag);
+		planeGrid.initCanvas(canvas);
+
+		planeGridRef.current = planeGrid;
+
+		return () => {
+			planeGrid.deinitCanvas();
+			planeGridRef.current = null!;
+		};
+	}, [plane]);
 
 	useEffect(() => {
-		let raf = 0;
+		const dirtyFlag = assertDirtyFlag();
 
 		function tick() {
 			if (dirtyFlag.readAndClear()) draw();
-			raf = requestAnimationFrame(tick);
+			rafNumber.current = requestAnimationFrame(tick);
 		}
-		raf = requestAnimationFrame(tick);
-		return () => cancelAnimationFrame(raf);
+		rafNumber.current = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(rafNumber.current);
 	}, []);
 
 	return (

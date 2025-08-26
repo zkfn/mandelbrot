@@ -8,7 +8,6 @@ export class ReadAndClearFlag {
 	public readAndClear = () => {
 		const previous = this.flag;
 		this.flag = false;
-		if (previous) console.log("Flag cleared");
 		return previous;
 	};
 }
