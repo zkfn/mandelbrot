@@ -1,13 +1,7 @@
-export interface Bounds {
-	minX: number;
-	minY: number;
-	maxX: number;
-	maxY: number;
-}
+import type { Bounds, Rect, Plane } from "@common/types";
 
-export interface Rect {
-	width: number;
-	height: number;
+export function clamp(min: number, val: number, max: number): number {
+	return Math.min(max, Math.max(min, val));
 }
 
 export const bounds = (init: Bounds | null = null): Bounds => {
@@ -46,3 +40,15 @@ export function boundsToRect(bounds: Bounds): Rect {
 		height: bounds.maxY - bounds.minY,
 	};
 }
+
+export const planeToBounds = (plane: Plane): Bounds => {
+	const half = plane.side * 0.5;
+	const [cx, cy] = plane.center;
+
+	return {
+		minX: cx - half,
+		maxX: cx + half,
+		minY: cy - half,
+		maxY: cy + half,
+	};
+};

@@ -1,4 +1,4 @@
-import GridViewer from "./GridViewer";
+import GridViewer from "@comp/GridViewer";
 
 function App() {
 	return (

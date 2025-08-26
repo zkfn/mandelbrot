@@ -1,23 +1,6 @@
-import { bounds, center, rect } from "./bounds";
-import { clamp, ReadAndClearFlag } from "./utils";
-import type { Bounds, Rect } from "./bounds";
-
-export interface Plane {
-	center: [number, number];
-	side: number;
-}
-
-export const planeToBounds = (plane: Plane): Bounds => {
-	const half = plane.side * 0.5;
-	const [cx, cy] = plane.center;
-
-	return {
-		minX: cx - half,
-		maxX: cx + half,
-		minY: cy - half,
-		maxY: cy + half,
-	};
-};
+import { bounds, center, rect, clamp, planeToBounds } from "@common/utils";
+import { ReadAndClearFlag } from "@common/flag";
+import type { Bounds, Rect, Plane } from "@common/types";
 
 /**
  *  When dealing with GridViewer, there are 4 separate coordinate systems that

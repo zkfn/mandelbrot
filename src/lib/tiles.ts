@@ -1,6 +1,5 @@
-import { boundsToRect, type Bounds, type Rect } from "./bounds";
-import type { Plane } from "./plane";
-import { planeToBounds } from "./plane";
+import { boundsToRect, planeToBounds } from "@common/utils";
+import type { Plane, Bounds, Rect } from "@common/types";
 
 export type TileId = string;
 
@@ -23,7 +22,7 @@ export class TileKey {
 }
 
 export class Tile {
-	constructor(
+	public constructor(
 		public section: Bounds,
 		public key: TileKey,
 	) {}
@@ -32,7 +31,7 @@ export class Tile {
 export class TileSetter {
 	private planeRectUnits: Rect;
 
-	constructor(plane: Plane) {
+	public constructor(plane: Plane) {
 		this.planeRectUnits = boundsToRect(planeToBounds(plane));
 	}
 

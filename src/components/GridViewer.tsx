@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, type FC } from "react";
-import type { Plane } from "./plane";
-import { PlaneGrid } from "./plane";
-import { Tile, TileSetter } from "./tiles";
-import { ReadAndClearFlag } from "./utils";
-import { boundsToRect } from "./bounds";
+import { boundsToRect } from "@common/utils";
+import { ReadAndClearFlag } from "@common/flag";
+import { Tile, TileSetter } from "@lib/tiles";
+import { PlaneGrid } from "@lib/grid";
+import type { Plane } from "@common/types";
 
 interface GridViewerProps {
 	plane: Plane;
