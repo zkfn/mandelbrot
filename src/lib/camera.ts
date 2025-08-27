@@ -36,7 +36,7 @@ export class Camera {
 	}
 
 	public adaptToCanvas(canvas: HTMLCanvasElement) {
-		this.cameraRect = rect(canvas.getBoundingClientRect());
+		this.cameraRect = rect(canvas);
 
 		const horizontalPPU = this.planeSide / this.cameraRect.width;
 		const verticalPPU = this.planeSide / this.cameraRect.height;

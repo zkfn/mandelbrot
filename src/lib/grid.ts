@@ -16,107 +16,133 @@ import type { Bounds, Plane } from "@common/types";
  *           pixels rendered per tile and pixel on the screen, the pixel of
  *           tile will be referred to as _texels_.
  */
-export class PlaneGrid {
-	private zoomFactor = 0.001;
+export class PlaneGridHandler {
+	private dirtyFlag: ReadAndClearFlag;
 
+	private zoomFactor = 0.001;
 	private camera: Camera;
 
-	private isPanning = false;
-	private panLastXPixels = 0;
-	private panLastYPixels = 0;
-	private invalidateFlag: ReadAndClearFlag;
+	private lastPanCoord: [number, number];
+	private isPanning: boolean;
 
+	private dprQuery: MediaQueryList;
 	private canvas: HTMLCanvasElement;
 	private resizeObserver: ResizeObserver;
 
-	public constructor(plane: Plane, invalidateFlag: ReadAndClearFlag) {
+	public constructor(plane: Plane, flag: ReadAndClearFlag) {
 		this.camera = new Camera(plane);
+		// this.dirtyFlag = new ReadAndClearFlag(true);
+		this.dirtyFlag = flag;
+
 		this.canvas = null!;
 		this.resizeObserver = null!;
-		this.invalidateFlag = invalidateFlag;
+		this.dprQuery = null!;
+
+		this.lastPanCoord = [0, 0];
+		this.isPanning = false;
 	}
 
-	public initCanvas(canvas: HTMLCanvasElement) {
-		const bounding = canvas.getBoundingClientRect();
-		const dpr = window.devicePixelRatio || 1;
-
-		const cameraWidth = Math.round(bounding.width * dpr);
-		const cameraHeight = Math.round(bounding.height * dpr);
-
-		canvas.width = cameraWidth;
-		canvas.height = cameraHeight;
-
-		this.camera.adaptToCanvas(canvas);
-		this.camera.adaptToDPR(dpr);
+	public attachToCanvas(canvas: HTMLCanvasElement) {
+		this.canvas = canvas;
+		this.updateCanvasDimensions();
 
 		canvas.addEventListener("wheel", this.handleWheel, { passive: false });
 		canvas.addEventListener("mousedown", this.handleMouseDown);
 		window.addEventListener("mousemove", this.handleMouseMove);
 		window.addEventListener("mouseup", this.handleMouseUp);
-		window.addEventListener("resize", this.handleResize);
+		window.addEventListener("resize", this.updateCanvasDimensions);
 
-		this.canvas = canvas;
-
-		this.resizeObserver = new ResizeObserver(this.handleResize);
+		this.resizeObserver = new ResizeObserver(this.updateCanvasDimensions);
 		this.resizeObserver.observe(this.canvas);
+
+		this.hookOntoDPR();
 	}
 
-	public deinitCanvas() {
+	public deattachFromCanvas() {
 		this.canvas.removeEventListener("wheel", this.handleWheel);
 		this.canvas.removeEventListener("mousedown", this.handleMouseDown);
 		window.removeEventListener("mousemove", this.handleMouseMove);
 		window.removeEventListener("mouseup", this.handleMouseUp);
-		window.removeEventListener("resize", this.handleResize);
+		window.removeEventListener("resize", this.updateCanvasDimensions);
+
+		this.resizeObserver.unobserve(this.canvas);
 		this.resizeObserver.disconnect();
+
+		this.unhookFromDPR();
 	}
 
-	public handleMouseDown = (event: MouseEvent) => {
+	private hookOntoDPR = () => {
+		this.dprQuery = matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+		this.dprQuery.addEventListener("change", this.updateAndRehook, {
+			once: true,
+		});
+	};
+
+	private unhookFromDPR = () => {
+		this.dprQuery.removeEventListener("change", this.updateAndRehook);
+	};
+
+	private updateAndRehook = () => {
+		this.updateCanvasDimensions();
+		this.hookOntoDPR();
+	};
+
+	private updateCanvasDimensions = () => {
+		const bounding = this.canvas.getBoundingClientRect();
+		const dpr = window.devicePixelRatio || 1;
+
+		this.canvas.width = Math.round(bounding.width * dpr);
+		this.canvas.height = Math.round(bounding.height * dpr);
+
+		this.camera.adaptToDPR(dpr);
+		this.camera.adaptToCanvas(this.canvas);
+		this.dirtyFlag.set();
+	};
+
+	private handleMouseDown = (event: MouseEvent) => {
 		event.preventDefault();
 
-		const [cameraX, cameraY] = this.camera.clientCoordToCamera(
+		this.lastPanCoord = this.camera.clientCoordToCamera(
 			event.clientX,
 			event.clientY,
 		);
 
-		this.panLastXPixels = cameraX;
-		this.panLastYPixels = cameraY;
-
-		this.isPanning = true;
 		this.canvas.style.cursor = "grabbing";
-		this.invalidateFlag.set();
+		this.isPanning = true;
+		this.dirtyFlag.set();
 	};
 
-	public handleMouseMove = (event: MouseEvent) => {
+	private handleMouseMove = (event: MouseEvent) => {
 		if (!this.isPanning) return;
 
+		const [lastX, lastY] = this.lastPanCoord;
 		const [cameraX, cameraY] = this.camera.clientCoordToCamera(
 			event.clientX,
 			event.clientY,
 		);
 
-		const dx = this.panLastXPixels - cameraX;
-		const dy = this.panLastYPixels - cameraY;
+		this.lastPanCoord = [cameraX, cameraY];
 
-		this.panLastXPixels = cameraX;
-		this.panLastYPixels = cameraY;
+		const dx = lastX - cameraX;
+		const dy = lastY - cameraY;
 
 		this.camera.moveViewportByCameraPx(dx, dy);
-		this.invalidateFlag.set();
+		this.dirtyFlag.set();
 	};
 
-	public handleMouseUp = () => {
+	private handleMouseUp = () => {
 		this.canvas.style.cursor = "grab";
 		this.isPanning = false;
 	};
 
-	public handleWheel = (event: WheelEvent) => {
+	private handleWheel = (event: WheelEvent) => {
 		event.preventDefault();
 
+		const factor = 2 ** (this.zoomFactor * event.deltaY);
 		const [cameraX, cameraY] = this.camera.clientCoordToCamera(
 			event.clientX,
 			event.clientY,
 		);
-		const factor = 2 ** (this.zoomFactor * event.deltaY);
 
 		this.camera.zoomViewportAtCameraPx(
 			this.camera.getUPP() * factor,
@@ -124,17 +150,12 @@ export class PlaneGrid {
 			cameraY,
 		);
 
-		this.invalidateFlag.set();
+		this.dirtyFlag.set();
 	};
 
 	public optimalDepthLevelPerResolution(texelResolution: number): number {
 		return this.camera.optimalDepthLevelPerResolution(texelResolution);
 	}
-
-	public handleResize = () => {
-		this.camera.adaptToCanvas(this.canvas);
-		this.invalidateFlag.set();
-	};
 
 	public getViewportBounds(): Bounds {
 		return this.camera.viewportBounds();

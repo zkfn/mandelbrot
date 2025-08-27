@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, type FC } from "react";
 import { boundsToRect } from "@common/utils";
 import { ReadAndClearFlag } from "@common/flag";
 import { Tile, TileSetter, TileState } from "@lib/tiles";
-import { PlaneGrid } from "@lib/grid";
+import { PlaneGridHandler } from "@lib/grid";
 import type { Plane } from "@common/types";
 import { TileStore } from "@lib/store";
 import { TileJobQueue } from "@lib/queue";
@@ -16,7 +16,7 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null!);
 	const tileSetter = useMemo(() => new TileSetter(plane), [plane]);
 	const dirtyFlagRef = useRef<ReadAndClearFlag>(new ReadAndClearFlag(true));
-	const planeGridRef = useRef<PlaneGrid>(null!);
+	const planeGridRef = useRef<PlaneGridHandler>(null!);
 	const tileStore = useRef<TileStore>(null!);
 	const tileQueue = useRef<TileJobQueue>(null!);
 	const executor = useRef<WorkerExecutor>(null!);
@@ -30,7 +30,7 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 		return dirtyFlagRef.current;
 	};
 
-	const assertAndGetPlaneGrid = (): PlaneGrid => {
+	const assertAndGetPlaneGrid = (): PlaneGridHandler => {
 		if (!planeGridRef.current) {
 			throw Error("Plane grid ref is empty.");
 		}
@@ -131,9 +131,9 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 		const dirtyFlag = assertDirtyFlag();
 		const canvas = assertCanvas();
 
-		const planeGrid = new PlaneGrid(plane, dirtyFlag);
+		const planeGrid = new PlaneGridHandler(plane, dirtyFlag);
 
-		planeGrid.initCanvas(canvas);
+		planeGrid.attachToCanvas(canvas);
 		planeGridRef.current = planeGrid;
 
 		tileQueue.current = new TileJobQueue();
@@ -145,8 +145,7 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 		);
 
 		return () => {
-			planeGrid.deinitCanvas();
-
+			planeGrid.deattachFromCanvas();
 			planeGridRef.current = null!;
 			// TODO: Deinit the queue and stuff;
 		};
