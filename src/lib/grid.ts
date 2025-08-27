@@ -1,6 +1,11 @@
 import { ReadAndClearFlag } from "@common/flag";
 import { Camera } from "@lib/camera";
-import type { Bounds, Plane } from "@common/types";
+import { Tile, TileSetter, TileState, ViewCornerTiles } from "./tiles";
+import { boundsToRect } from "@common/utils";
+import { TileStore } from "./store";
+import { TileJobQueue } from "./queue";
+import { WorkerExecutor } from "./executor";
+import type { Plane } from "@common/types";
 
 /**
  *  When dealing with GridViewer, there are 4 separate coordinate systems that
@@ -17,33 +22,137 @@ import type { Bounds, Plane } from "@common/types";
  *           tile will be referred to as _texels_.
  */
 export class PlaneGridHandler {
-	private dirtyFlag: ReadAndClearFlag;
-
 	private zoomFactor = 0.001;
+
 	private camera: Camera;
+	private tileSetter: TileSetter;
+	private tileStore: TileStore;
+	private tileQueue: TileJobQueue;
+	private previousTiles: ViewCornerTiles | null;
+	private dirtyFlag: ReadAndClearFlag;
+	private executor: WorkerExecutor;
 
 	private lastPanCoord: [number, number];
 	private isPanning: boolean;
 
 	private dprQuery: MediaQueryList;
 	private canvas: HTMLCanvasElement;
+	private ctx: CanvasRenderingContext2D;
 	private resizeObserver: ResizeObserver;
 
-	public constructor(plane: Plane, flag: ReadAndClearFlag) {
+	public constructor(plane: Plane) {
 		this.camera = new Camera(plane);
-		// this.dirtyFlag = new ReadAndClearFlag(true);
-		this.dirtyFlag = flag;
+		this.tileSetter = new TileSetter(plane);
+		this.tileStore = new TileStore();
+		this.tileQueue = new TileJobQueue();
+		this.dirtyFlag = new ReadAndClearFlag(true);
+		this.executor = new WorkerExecutor(
+			this.tileStore,
+			this.tileQueue,
+			this.dirtyFlag,
+		);
 
+		this.previousTiles = null;
 		this.canvas = null!;
 		this.resizeObserver = null!;
 		this.dprQuery = null!;
+		this.ctx = null!;
 
 		this.lastPanCoord = [0, 0];
 		this.isPanning = false;
 	}
 
+	public draw() {
+		if (!this.dirtyFlag.readAndClear()) return;
+		this.clearCanvas();
+
+		function colorFor(state: TileState): string {
+			if (state === TileState.READY) return "#0f0";
+			if (state === TileState.RENDERING) return "#ff4";
+			else return "#aa0";
+		}
+
+		const paintTiles = (tiles: Tile[]) => {
+			for (const tile of tiles) {
+				const camBounds = this.camera.planeBoundsToCamera(tile.section);
+
+				const { minX, minY } = camBounds;
+				const { width, height } = boundsToRect(camBounds);
+
+				const record = this.tileStore.getTileRecord(tile.key.id());
+
+				if (record && record.state != TileState.QUEUED) {
+					this.ctx.fillStyle = colorFor(record.state);
+					this.ctx.fillRect(minX, minY, width, height);
+					this.ctx.strokeRect(minX, minY, width, height);
+				}
+			}
+		};
+
+		const processTiles = (tiles: Tile[]) => {
+			for (const tile of tiles) {
+				const record = this.tileStore.getTileRecord(tile.key.id());
+
+				if (!record || record.state == TileState.QUEUED) {
+					this.tileQueue.push(tile);
+					this.tileStore.setQueued(tile.key.id());
+				}
+			}
+		};
+
+		const desiredDepth = this.camera.optimalDepthLevelPerResolution(256);
+		const coarserDepth = desiredDepth - 1;
+		const blurDepth = desiredDepth - 2;
+
+		const bounds = this.camera.viewportBounds();
+		const cornerTiles = this.tileSetter.cornerTiles(bounds, desiredDepth);
+
+		const desiredTiles = this.tileSetter.layTiles(cornerTiles);
+
+		const coarserTiles = this.tileSetter.layTiles(
+			this.tileSetter.cornerTiles(bounds, coarserDepth),
+		);
+
+		const blurTiles = this.tileSetter.layTiles(
+			this.tileSetter.cornerTiles(bounds, blurDepth),
+		);
+
+		if (!this.previousTiles || !this.previousTiles.isSameAs(cornerTiles)) {
+			this.previousTiles = cornerTiles;
+			this.tileQueue.nextGeneration();
+			this.tileStore.prune();
+
+			processTiles(blurTiles);
+			processTiles(coarserTiles);
+			processTiles(desiredTiles);
+
+			this.executor.pump();
+			console.log("Updated Jobs");
+		}
+
+		paintTiles(blurTiles);
+		paintTiles(coarserTiles);
+		paintTiles(desiredTiles);
+	}
+
+	private clearCanvas() {
+		this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+		this.ctx.fillStyle = "#fff";
+		this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+		this.ctx.strokeStyle = "#000";
+		this.ctx.lineWidth = 1;
+	}
+
 	public attachToCanvas(canvas: HTMLCanvasElement) {
+		const ctx = canvas.getContext("2d");
+
+		if (!ctx) {
+			throw Error("Canvas context is empty.");
+		}
+
+		this.ctx = ctx;
 		this.canvas = canvas;
+
 		this.updateCanvasDimensions();
 
 		canvas.addEventListener("wheel", this.handleWheel, { passive: false });
@@ -69,6 +178,11 @@ export class PlaneGridHandler {
 		this.resizeObserver.disconnect();
 
 		this.unhookFromDPR();
+
+		this.canvas = null!;
+		this.ctx = null!;
+
+		// TODO clear queue and store
 	}
 
 	private hookOntoDPR = () => {
@@ -80,6 +194,7 @@ export class PlaneGridHandler {
 
 	private unhookFromDPR = () => {
 		this.dprQuery.removeEventListener("change", this.updateAndRehook);
+		this.dprQuery = null!;
 	};
 
 	private updateAndRehook = () => {
@@ -152,16 +267,4 @@ export class PlaneGridHandler {
 
 		this.dirtyFlag.set();
 	};
-
-	public optimalDepthLevelPerResolution(texelResolution: number): number {
-		return this.camera.optimalDepthLevelPerResolution(texelResolution);
-	}
-
-	public getViewportBounds(): Bounds {
-		return this.camera.viewportBounds();
-	}
-
-	public planeBoundsToCamera(bounds: Bounds): Bounds {
-		return this.camera.planeBoundsToCamera(bounds);
-	}
 }

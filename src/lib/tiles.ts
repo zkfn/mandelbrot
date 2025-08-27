@@ -1,5 +1,4 @@
-import { boundsToRect, planeToBounds } from "@common/utils";
-import type { Plane, Bounds, Rect } from "@common/types";
+import type { Plane, Bounds } from "@common/types";
 
 export type TileId = string;
 
@@ -28,36 +27,61 @@ export class Tile {
 	) {}
 }
 
+export class ViewCornerTiles implements Bounds {
+	public constructor(
+		public depth: number,
+		public minX: number,
+		public maxX: number,
+		public minY: number,
+		public maxY: number,
+	) {}
+
+	public isSameAs(other: ViewCornerTiles) {
+		return (
+			this.depth === other.depth &&
+			this.minX === other.minX &&
+			this.maxX === other.maxX &&
+			this.minY === other.minY &&
+			this.maxY === other.maxY
+		);
+	}
+}
+
 export class TileSetter {
-	private planeRectUnits: Rect;
+	private planeSide: number;
 
 	public constructor(plane: Plane) {
-		this.planeRectUnits = boundsToRect(planeToBounds(plane));
+		this.planeSide = plane.side;
 	}
 
-	public layTiles(boundsUnits: Bounds, depthLevel: number): Tile[] {
+	public cornerTiles(viewBounds: Bounds, depth: number): ViewCornerTiles {
+		const tileWidthUnits = this.tileUnitSizeFromDepthLevel(depth);
+
+		return new ViewCornerTiles(
+			depth,
+			Math.floor(viewBounds.minX / tileWidthUnits),
+			Math.ceil(viewBounds.maxX / tileWidthUnits),
+			Math.floor(viewBounds.minY / tileWidthUnits),
+			Math.ceil(viewBounds.maxY / tileWidthUnits),
+		);
+	}
+
+	public layTiles(cornerTiles: ViewCornerTiles): Tile[] {
 		const tiles: Tile[] = [];
-
-		const tileWidthUnits = this.tileUnitSizeFromDepthLevel(depthLevel);
-
-		const ix0 = Math.floor(boundsUnits.minX / tileWidthUnits);
-		const iy0 = Math.floor(boundsUnits.minY / tileWidthUnits);
-
-		const ixmax = Math.ceil(boundsUnits.maxX / tileWidthUnits);
-		const iymax = Math.ceil(boundsUnits.maxY / tileWidthUnits);
+		const tileWidthUnits = this.tileUnitSizeFromDepthLevel(cornerTiles.depth);
 
 		let minX;
 		let maxX;
 
-		let minY = iy0 * tileWidthUnits;
+		let minY = cornerTiles.minY * tileWidthUnits;
 		let maxY = minY + tileWidthUnits;
 
-		for (let iy = iy0; iy < iymax; iy++) {
-			minX = ix0 * tileWidthUnits;
+		for (let iy = cornerTiles.minY; iy < cornerTiles.maxY; iy++) {
+			minX = cornerTiles.minX * tileWidthUnits;
 			maxX = minX + tileWidthUnits;
 
-			for (let ix = ix0; ix < ixmax; ix++) {
-				const key = new TileKey(depthLevel, ix, iy);
+			for (let ix = cornerTiles.minX; ix < cornerTiles.maxX; ix++) {
+				const key = new TileKey(cornerTiles.depth, ix, iy);
 				const tile = new Tile({ minX, maxX, minY, maxY }, key);
 				tiles.push(tile);
 
@@ -73,6 +97,6 @@ export class TileSetter {
 	}
 
 	private tileUnitSizeFromDepthLevel(depthLevel: number): number {
-		return this.planeRectUnits.width / Math.pow(2, depthLevel);
+		return this.planeSide / Math.pow(2, depthLevel);
 	}
 }
