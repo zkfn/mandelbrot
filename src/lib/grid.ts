@@ -1,6 +1,7 @@
-import { bounds, center, rect, clamp, planeToBounds } from "@common/utils";
+import { rect, clamp, planeToBounds } from "@common/utils";
 import { ReadAndClearFlag } from "@common/flag";
 import type { Bounds, Rect, Plane } from "@common/types";
+import { Viewport } from "@lib/viewport";
 
 /**
  *  When dealing with GridViewer, there are 4 separate coordinate systems that
@@ -20,12 +21,13 @@ export class PlaneGrid {
 	private zoomFactor = 0.001;
 	private dpr: number;
 
+	private viewport: Viewport;
+
 	private maxUnitsPerPixel: number;
 	private minUnitsPerPixel: number;
 	private unitsPerPixel: number;
 
 	private cameraRectPixels: Rect;
-	private cameraBoundsUnits: Bounds;
 	private planeBoundsUnits: Bounds;
 
 	private isPanning = false;
@@ -44,8 +46,8 @@ export class PlaneGrid {
 			throw new Error("Plane bounds need to form a square.");
 		}
 
+		this.viewport = new Viewport(plane);
 		this.cameraRectPixels = rect();
-		this.cameraBoundsUnits = bounds();
 
 		this.canvas = null!;
 		this.resizeObserver = null!;
@@ -100,23 +102,13 @@ export class PlaneGrid {
 	private adaptMaxUnitPerPixel() {
 		const horizontalPPU = this.planeWidthUnits() / this.cameraRectPixels.width;
 		const verticalPPU = this.planeHeightUnits() / this.cameraRectPixels.height;
+
 		this.maxUnitsPerPixel = Math.max(horizontalPPU, verticalPPU);
+		this.unitsPerPixel = this.maxUnitsPerPixel;
 	}
 
 	private upscaleAndCenter() {
-		this.unitsPerPixel = this.maxUnitsPerPixel;
-
-		const spanX = this.unitsPerPixel * this.cameraRectPixels.width;
-		const spanY = this.unitsPerPixel * this.cameraRectPixels.height;
-
-		const [cx, cy] = center(this.planeBoundsUnits);
-
-		this.cameraBoundsUnits = {
-			minX: cx - spanX * 0.5,
-			maxX: cx + spanX * 0.5,
-			minY: cy - spanY * 0.5,
-			maxY: cy + spanY * 0.5,
-		};
+		this.viewport.resize(this.viewportSpanX(), this.viewportSpanY());
 	}
 
 	public handleMouseDown = (event: MouseEvent) => {
@@ -149,17 +141,10 @@ export class PlaneGrid {
 		this.panLastXPixels = planeX;
 		this.panLastYPixels = planeY;
 
-		const dxUnits = dxPixels * this.unitsPerPixel;
-		const dyUnits = dyPixels * this.unitsPerPixel;
+		const dxUnits = -dxPixels * this.unitsPerPixel;
+		const dyUnits = -dyPixels * this.unitsPerPixel;
 
-		this.cameraBoundsUnits = {
-			minX: this.cameraBoundsUnits.minX - dxUnits,
-			maxX: this.cameraBoundsUnits.maxX - dxUnits,
-			minY: this.cameraBoundsUnits.minY - dyUnits,
-			maxY: this.cameraBoundsUnits.maxY - dyUnits,
-		};
-
-		this.clampToOuterPlane();
+		this.viewport.moveBy(dxUnits, dyUnits);
 		this.invalidateFlag.set();
 	};
 
@@ -172,7 +157,8 @@ export class PlaneGrid {
 		event.preventDefault();
 
 		const [px, py] = this.canvasToCameraPx(event.clientX, event.clientY);
-		const [planeX, planeY] = this.cameraCoordToPlane(px, py);
+		const zoomAround = this.cameraCoordToPlane(px, py);
+
 		const factor = 2 ** (this.zoomFactor * event.deltaY);
 
 		this.unitsPerPixel = clamp(
@@ -181,38 +167,15 @@ export class PlaneGrid {
 			this.maxUnitsPerPixel,
 		);
 
-		const newWidthUnits = this.unitsPerPixel * this.cameraRectPixels.width;
-		const newHeightUnits = this.unitsPerPixel * this.cameraRectPixels.height;
-
-		const cameraWidthUnits =
-			this.cameraBoundsUnits.maxX - this.cameraBoundsUnits.minX;
-		const cameraHeightUnits =
-			this.cameraBoundsUnits.maxY - this.cameraBoundsUnits.minY;
-
-		const cursorHorizontalProportion =
-			(planeX - this.cameraBoundsUnits.minX) / cameraWidthUnits;
-		const cursorVerticalProportion =
-			(planeY - this.cameraBoundsUnits.minY) / cameraHeightUnits;
-
-		const minX = newWidthUnits * cursorHorizontalProportion;
-		const minY = newHeightUnits * cursorVerticalProportion;
-
-		const maxX = newWidthUnits - minX;
-		const maxY = newHeightUnits - minY;
-
-		this.cameraBoundsUnits = {
-			minX: planeX - minX,
-			maxX: planeX + maxX,
-			minY: planeY - minY,
-			maxY: planeY + maxY,
-		};
-
-		this.clampToOuterPlane();
+		this.viewport.resize(
+			this.viewportSpanX(),
+			this.viewportSpanY(),
+			zoomAround,
+		);
 		this.invalidateFlag.set();
 	};
 
 	public handleResize = () => {
-		const [cx, cy] = center(this.cameraBoundsUnits);
 		const oldUPP = this.unitsPerPixel;
 
 		this.adaptCameraToCanvas(this.canvas);
@@ -224,51 +187,9 @@ export class PlaneGrid {
 			this.maxUnitsPerPixel,
 		);
 
-		const spanX = this.unitsPerPixel * this.cameraRectPixels.width;
-		const spanY = this.unitsPerPixel * this.cameraRectPixels.height;
-
-		this.cameraBoundsUnits = {
-			minX: cx - spanX * 0.5,
-			maxX: cx + spanX * 0.5,
-			minY: cy - spanY * 0.5,
-			maxY: cy + spanY * 0.5,
-		};
-
-		this.clampToOuterPlane();
+		this.viewport.resize(this.viewportSpanX(), this.viewportSpanY());
 		this.invalidateFlag.set();
 	};
-
-	private clampToOuterPlane() {
-		let { minX, minY } = this.cameraBoundsUnits;
-
-		const width = this.cameraWidthUnits();
-		const height = this.cameraHeightUnits();
-
-		if (width > this.planeWidthUnits()) {
-			const halfOverreach = (width - this.planeWidthUnits()) / 2;
-			minX = this.planeBoundsUnits.minX - halfOverreach;
-		} else {
-			const maxMinX = this.planeBoundsUnits.maxX - width;
-			if (minX < this.planeBoundsUnits.minX) minX = this.planeBoundsUnits.minX;
-			if (minX > maxMinX) minX = maxMinX;
-		}
-
-		if (height > this.planeHeightUnits()) {
-			const halfOverreach = (height - this.planeHeightUnits()) / 2;
-			minY = this.planeBoundsUnits.minY - halfOverreach;
-		} else {
-			const maxMinY = this.planeBoundsUnits.maxY - height;
-			if (minY < this.planeBoundsUnits.minY) minY = this.planeBoundsUnits.minY;
-			if (minY > maxMinY) minY = maxMinY;
-		}
-
-		this.cameraBoundsUnits = {
-			minX,
-			maxX: minX + width,
-			minY,
-			maxY: minY + height,
-		};
-	}
 
 	private canvasToCameraPx(clX: number, clY: number): [number, number] {
 		const { top, left } = this.canvas.getBoundingClientRect();
@@ -280,7 +201,7 @@ export class PlaneGrid {
 	}
 
 	public getCameraBounds(): Bounds {
-		return bounds(this.cameraBoundsUnits);
+		return this.viewport.bounds();
 	}
 
 	public cameraCoordToPlane(x: number, y: number): [number, number] {
@@ -288,11 +209,11 @@ export class PlaneGrid {
 	}
 
 	public cameraXToPlane(x: number): number {
-		return this.cameraBoundsUnits.minX + x * this.unitsPerPixel;
+		return this.viewport.minX() + x * this.unitsPerPixel;
 	}
 
 	public cameraYToPlane(y: number): number {
-		return this.cameraBoundsUnits.minY + y * this.unitsPerPixel;
+		return this.viewport.minY() + y * this.unitsPerPixel;
 	}
 
 	public planeCoordToCamera(x: number, y: number): [number, number] {
@@ -300,11 +221,11 @@ export class PlaneGrid {
 	}
 
 	public planeXToCamera(x: number): number {
-		return (x - this.cameraBoundsUnits.minX) / this.unitsPerPixel;
+		return (x - this.viewport.minX()) / this.unitsPerPixel;
 	}
 
 	public planeYToCamera(y: number): number {
-		return (y - this.cameraBoundsUnits.minY) / this.unitsPerPixel;
+		return (y - this.viewport.minY()) / this.unitsPerPixel;
 	}
 
 	public optimalDepthLevelPerResolution(texelResolution: number): number {
@@ -326,19 +247,21 @@ export class PlaneGrid {
 		};
 	}
 
-	private cameraWidthUnits() {
-		return this.cameraBoundsUnits.maxX - this.cameraBoundsUnits.minX;
-	}
-
-	private cameraHeightUnits() {
-		return this.cameraBoundsUnits.maxY - this.cameraBoundsUnits.minY;
-	}
-
 	private planeWidthUnits() {
 		return this.planeBoundsUnits.maxX - this.planeBoundsUnits.minX;
 	}
 
 	private planeHeightUnits() {
 		return this.planeBoundsUnits.maxY - this.planeBoundsUnits.minY;
+	}
+
+	// TODO rename this
+	private viewportSpanX(): number {
+		return this.cameraRectPixels.width * this.unitsPerPixel;
+	}
+
+	// TODO rename this
+	private viewportSpanY(): number {
+		return this.cameraRectPixels.height * this.unitsPerPixel;
 	}
 }
