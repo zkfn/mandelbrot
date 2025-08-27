@@ -28,7 +28,7 @@ export class Viewport {
 		const minY = height * verticalProportion;
 
 		const maxX = width - minX;
-		const maxY = width - minY;
+		const maxY = height - minY;
 
 		this.viewBounds = {
 			minX: cx - minX,

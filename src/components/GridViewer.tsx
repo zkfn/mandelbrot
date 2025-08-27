@@ -63,7 +63,7 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 	function draw() {
 		const planeGrid = assertAndGetPlaneGrid();
 		const [canvas, ctx] = assertAndGetCanvasWithCtx();
-		const camera = planeGrid.getCameraBounds();
+		const camera = planeGrid.getViewportBounds();
 
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 		ctx.fillStyle = "#fff";

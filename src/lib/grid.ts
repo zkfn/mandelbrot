@@ -1,7 +1,6 @@
-import { rect, clamp, planeToBounds } from "@common/utils";
 import { ReadAndClearFlag } from "@common/flag";
-import type { Bounds, Rect, Plane } from "@common/types";
-import { Viewport } from "@lib/viewport";
+import { Camera } from "@lib/camera";
+import type { Bounds, Plane } from "@common/types";
 
 /**
  *  When dealing with GridViewer, there are 4 separate coordinate systems that
@@ -19,16 +18,8 @@ import { Viewport } from "@lib/viewport";
  */
 export class PlaneGrid {
 	private zoomFactor = 0.001;
-	private dpr: number;
 
-	private viewport: Viewport;
-
-	private maxUnitsPerPixel: number;
-	private minUnitsPerPixel: number;
-	private unitsPerPixel: number;
-
-	private cameraRectPixels: Rect;
-	private planeBoundsUnits: Bounds;
+	private camera: Camera;
 
 	private isPanning = false;
 	private panLastXPixels = 0;
@@ -39,29 +30,24 @@ export class PlaneGrid {
 	private resizeObserver: ResizeObserver;
 
 	public constructor(plane: Plane, invalidateFlag: ReadAndClearFlag) {
-		this.dpr = window.devicePixelRatio || 1;
-		this.planeBoundsUnits = planeToBounds(plane);
-
-		if (this.planeWidthUnits() != this.planeHeightUnits()) {
-			throw new Error("Plane bounds need to form a square.");
-		}
-
-		this.viewport = new Viewport(plane);
-		this.cameraRectPixels = rect();
-
+		this.camera = new Camera(plane);
 		this.canvas = null!;
 		this.resizeObserver = null!;
 		this.invalidateFlag = invalidateFlag;
-
-		this.unitsPerPixel = 0;
-		this.maxUnitsPerPixel = 0;
-		this.minUnitsPerPixel = 2 ** -58;
 	}
 
 	public initCanvas(canvas: HTMLCanvasElement) {
-		this.adaptCameraToCanvas(canvas);
-		this.adaptMaxUnitPerPixel();
-		this.upscaleAndCenter();
+		const bounding = canvas.getBoundingClientRect();
+		const dpr = window.devicePixelRatio || 1;
+
+		const cameraWidth = Math.round(bounding.width * dpr);
+		const cameraHeight = Math.round(bounding.height * dpr);
+
+		canvas.width = cameraWidth;
+		canvas.height = cameraHeight;
+
+		this.camera.adaptToCanvas(canvas);
+		this.camera.adaptToDPR(dpr);
 
 		canvas.addEventListener("wheel", this.handleWheel, { passive: false });
 		canvas.addEventListener("mousedown", this.handleMouseDown);
@@ -84,67 +70,37 @@ export class PlaneGrid {
 		this.resizeObserver.disconnect();
 	}
 
-	public adaptCameraToCanvas(canvas: HTMLCanvasElement) {
-		const bounding = canvas.getBoundingClientRect();
-
-		const cameraWidth = Math.round(bounding.width * this.dpr);
-		const cameraHeight = Math.round(bounding.height * this.dpr);
-
-		canvas.width = cameraWidth;
-		canvas.height = cameraHeight;
-
-		this.cameraRectPixels = {
-			width: cameraWidth,
-			height: cameraHeight,
-		};
-	}
-
-	private adaptMaxUnitPerPixel() {
-		const horizontalPPU = this.planeWidthUnits() / this.cameraRectPixels.width;
-		const verticalPPU = this.planeHeightUnits() / this.cameraRectPixels.height;
-
-		this.maxUnitsPerPixel = Math.max(horizontalPPU, verticalPPU);
-		this.unitsPerPixel = this.maxUnitsPerPixel;
-	}
-
-	private upscaleAndCenter() {
-		this.viewport.resize(this.viewportSpanX(), this.viewportSpanY());
-	}
-
 	public handleMouseDown = (event: MouseEvent) => {
 		event.preventDefault();
 
-		const [planeX, planeY] = this.canvasToCameraPx(
+		const [cameraX, cameraY] = this.camera.clientCoordToCamera(
 			event.clientX,
 			event.clientY,
 		);
 
-		this.panLastXPixels = planeX;
-		this.panLastYPixels = planeY;
+		this.panLastXPixels = cameraX;
+		this.panLastYPixels = cameraY;
 
 		this.isPanning = true;
-		this.invalidateFlag.set();
 		this.canvas.style.cursor = "grabbing";
+		this.invalidateFlag.set();
 	};
 
 	public handleMouseMove = (event: MouseEvent) => {
 		if (!this.isPanning) return;
 
-		const [planeX, planeY] = this.canvasToCameraPx(
+		const [cameraX, cameraY] = this.camera.clientCoordToCamera(
 			event.clientX,
 			event.clientY,
 		);
 
-		const dxPixels = planeX - this.panLastXPixels;
-		const dyPixels = planeY - this.panLastYPixels;
+		const dx = this.panLastXPixels - cameraX;
+		const dy = this.panLastYPixels - cameraY;
 
-		this.panLastXPixels = planeX;
-		this.panLastYPixels = planeY;
+		this.panLastXPixels = cameraX;
+		this.panLastYPixels = cameraY;
 
-		const dxUnits = -dxPixels * this.unitsPerPixel;
-		const dyUnits = -dyPixels * this.unitsPerPixel;
-
-		this.viewport.moveBy(dxUnits, dyUnits);
+		this.camera.moveViewportByCameraPx(dx, dy);
 		this.invalidateFlag.set();
 	};
 
@@ -156,112 +112,35 @@ export class PlaneGrid {
 	public handleWheel = (event: WheelEvent) => {
 		event.preventDefault();
 
-		const [px, py] = this.canvasToCameraPx(event.clientX, event.clientY);
-		const zoomAround = this.cameraCoordToPlane(px, py);
-
+		const [cameraX, cameraY] = this.camera.clientCoordToCamera(
+			event.clientX,
+			event.clientY,
+		);
 		const factor = 2 ** (this.zoomFactor * event.deltaY);
 
-		this.unitsPerPixel = clamp(
-			this.minUnitsPerPixel,
-			this.unitsPerPixel * factor,
-			this.maxUnitsPerPixel,
+		this.camera.zoomViewportAtCameraPx(
+			this.camera.getUPP() * factor,
+			cameraX,
+			cameraY,
 		);
 
-		this.viewport.resize(
-			this.viewportSpanX(),
-			this.viewportSpanY(),
-			zoomAround,
-		);
 		this.invalidateFlag.set();
 	};
-
-	public handleResize = () => {
-		const oldUPP = this.unitsPerPixel;
-
-		this.adaptCameraToCanvas(this.canvas);
-		this.adaptMaxUnitPerPixel();
-
-		this.unitsPerPixel = clamp(
-			this.minUnitsPerPixel,
-			oldUPP,
-			this.maxUnitsPerPixel,
-		);
-
-		this.viewport.resize(this.viewportSpanX(), this.viewportSpanY());
-		this.invalidateFlag.set();
-	};
-
-	private canvasToCameraPx(clX: number, clY: number): [number, number] {
-		const { top, left } = this.canvas.getBoundingClientRect();
-
-		const px = (clX - left) * this.dpr;
-		const py = (clY - top) * this.dpr;
-
-		return [px, py];
-	}
-
-	public getCameraBounds(): Bounds {
-		return this.viewport.bounds();
-	}
-
-	public cameraCoordToPlane(x: number, y: number): [number, number] {
-		return [this.cameraXToPlane(x), this.cameraYToPlane(y)];
-	}
-
-	public cameraXToPlane(x: number): number {
-		return this.viewport.minX() + x * this.unitsPerPixel;
-	}
-
-	public cameraYToPlane(y: number): number {
-		return this.viewport.minY() + y * this.unitsPerPixel;
-	}
-
-	public planeCoordToCamera(x: number, y: number): [number, number] {
-		return [this.planeXToCamera(x), this.planeYToCamera(y)];
-	}
-
-	public planeXToCamera(x: number): number {
-		return (x - this.viewport.minX()) / this.unitsPerPixel;
-	}
-
-	public planeYToCamera(y: number): number {
-		return (y - this.viewport.minY()) / this.unitsPerPixel;
-	}
 
 	public optimalDepthLevelPerResolution(texelResolution: number): number {
-		return Math.ceil(
-			Math.log2(
-				this.planeWidthUnits() / (this.unitsPerPixel * texelResolution),
-			),
-		);
+		return this.camera.optimalDepthLevelPerResolution(texelResolution);
+	}
+
+	public handleResize = () => {
+		this.camera.adaptToCanvas(this.canvas);
+		this.invalidateFlag.set();
+	};
+
+	public getViewportBounds(): Bounds {
+		return this.camera.viewportBounds();
 	}
 
 	public planeBoundsToCamera(bounds: Bounds): Bounds {
-		const [minX, minY] = this.planeCoordToCamera(bounds.minX, bounds.minY);
-		const [maxX, maxY] = this.planeCoordToCamera(bounds.maxX, bounds.maxY);
-		return {
-			minX,
-			minY,
-			maxX,
-			maxY,
-		};
-	}
-
-	private planeWidthUnits() {
-		return this.planeBoundsUnits.maxX - this.planeBoundsUnits.minX;
-	}
-
-	private planeHeightUnits() {
-		return this.planeBoundsUnits.maxY - this.planeBoundsUnits.minY;
-	}
-
-	// TODO rename this
-	private viewportSpanX(): number {
-		return this.cameraRectPixels.width * this.unitsPerPixel;
-	}
-
-	// TODO rename this
-	private viewportSpanY(): number {
-		return this.cameraRectPixels.height * this.unitsPerPixel;
+		return this.camera.planeBoundsToCamera(bounds);
 	}
 }
