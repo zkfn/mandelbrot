@@ -1,4 +1,4 @@
-import { TileState, type TileId } from "@lib/tiles";
+import { TileState, type TileId } from "@common/tiles";
 
 export interface TileRecord<Payload = unknown> {
 	state: TileState;

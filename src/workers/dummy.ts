@@ -1,19 +1,19 @@
-type DummyInMessage = {
-	jobId: number;
-	tileId: string;
-	simulateMs?: number;
-};
-
-type DummyOutMessage = {
-	jobId: number;
-	tileId: string;
-};
+import type { WorkerOutMessage, WorkerInMessage } from "@common/protocol";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-self.onmessage = async (e: MessageEvent<DummyInMessage>) => {
-	const { jobId, tileId, simulateMs = 200 } = e.data;
-	await sleep(simulateMs);
-	const out: DummyOutMessage = { jobId, tileId };
+const minMs = 20;
+const maxMs = 100;
+
+self.onmessage = async (e: MessageEvent<WorkerInMessage>) => {
+	const { jobId, tileId } = e.data;
+	await sleep(Math.floor(minMs + Math.random() * (maxMs - minMs)));
+
+	const out: WorkerOutMessage<null> = {
+		jobId,
+		tileId,
+		payload: null,
+	};
+
 	(self as DedicatedWorkerGlobalScope).postMessage(out);
 };

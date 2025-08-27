@@ -1,6 +1,7 @@
 import { ReadAndClearFlag } from "@common/flag";
 import { Camera } from "@lib/camera";
-import { Tile, TileSetter, TileState, ViewCornerTiles } from "./tiles";
+import { Tile, TileState } from "@common/tiles";
+import { TileSetter, ViewCornerTiles } from "@lib/tiles";
 import { boundsToRect } from "@common/utils";
 import { TileStore } from "./store";
 import { TileJobQueue } from "./queue";
