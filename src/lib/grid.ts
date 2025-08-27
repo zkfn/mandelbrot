@@ -165,6 +165,7 @@ export class PlaneGridHandler {
 		this.resizeObserver.observe(this.canvas);
 
 		this.hookOntoDPR();
+		this.setDefaultPointerStyle();
 	}
 
 	public deattachFromCanvas() {
@@ -222,7 +223,7 @@ export class PlaneGridHandler {
 			event.clientY,
 		);
 
-		this.canvas.style.cursor = "grabbing";
+		this.setGrabbingPointerStyle();
 		this.isPanning = true;
 		this.dirtyFlag.set();
 	};
@@ -246,7 +247,7 @@ export class PlaneGridHandler {
 	};
 
 	private handleMouseUp = () => {
-		this.canvas.style.cursor = "grab";
+		this.setDefaultPointerStyle();
 		this.isPanning = false;
 	};
 
@@ -267,4 +268,12 @@ export class PlaneGridHandler {
 
 		this.dirtyFlag.set();
 	};
+
+	private setDefaultPointerStyle() {
+		this.canvas.style.cursor = "crosshair";
+	}
+
+	private setGrabbingPointerStyle() {
+		this.canvas.style.cursor = "grabbing";
+	}
 }

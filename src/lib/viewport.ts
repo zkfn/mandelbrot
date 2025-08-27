@@ -24,17 +24,17 @@ export class Viewport {
 		const horizontalProportion = (cx - this.viewBounds.minX) / this.width();
 		const verticalProportion = (cy - this.viewBounds.minY) / this.height();
 
-		const minX = width * horizontalProportion;
-		const minY = height * verticalProportion;
+		const minX = cx - width * horizontalProportion;
+		const minY = cy - height * verticalProportion;
 
-		const maxX = width - minX;
-		const maxY = height - minY;
+		const maxX = minX + width;
+		const maxY = minY + height;
 
 		this.viewBounds = {
-			minX: cx - minX,
-			maxX: cx + maxX,
-			minY: cy - minY,
-			maxY: cy + maxY,
+			minX,
+			maxX,
+			minY,
+			maxY,
 		};
 
 		this.clampToPlane();

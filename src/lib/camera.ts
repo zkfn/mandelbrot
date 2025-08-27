@@ -52,8 +52,9 @@ export class Camera {
 	}
 
 	public zoomViewportAtCameraPx(upp: number, x: number, y: number) {
+		const center = this.cameraCoordToPlane(x, y);
 		this.setUPP(upp);
-		this.resizeViewport(this.cameraCoordToPlane(x, y));
+		this.resizeViewport(center);
 	}
 
 	public adaptToDPR(dpr: number) {
