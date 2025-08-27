@@ -16,7 +16,9 @@ export class Camera {
 		this.viewport = new Viewport(plane);
 		this.planeSide = plane.side;
 		this.cameraRect = boundsToRect(planeToBounds(plane));
-		this.minUPP = 2 ** -58;
+
+		// TODO find nice TH or solve the zoomed in jagging when panning
+		this.minUPP = 2 ** -52;
 		this.maxUPP = 1;
 		this.curUPP = 1;
 		this.DPR = 1;
