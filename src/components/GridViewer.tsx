@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type FC } from "react";
+import { useLayoutEffect, useRef, type FC } from "react";
 import { PlaneGridHandler } from "@lib/grid";
 import type { Plane } from "@common/types";
 
@@ -9,7 +9,6 @@ interface GridViewerProps {
 const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null!);
 	const planeGridRef = useRef<PlaneGridHandler>(null!);
-	const rafNumber = useRef<number>(0);
 
 	const assertCanvas = (): HTMLCanvasElement => {
 		if (!canvasRef.current) {
@@ -31,16 +30,6 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 			planeGridRef.current = null!;
 		};
 	}, [plane]);
-
-	useEffect(() => {
-		function tick() {
-			planeGridRef.current.draw();
-			rafNumber.current = requestAnimationFrame(tick);
-		}
-
-		rafNumber.current = requestAnimationFrame(tick);
-		return () => cancelAnimationFrame(rafNumber.current);
-	}, []);
 
 	return (
 		<canvas

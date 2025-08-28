@@ -40,7 +40,11 @@ export class TileSetter {
 		);
 	}
 
-	public layTiles(cornerTiles: ViewCornerTiles): Tile[] {
+	public layTilesFromViewBounds(view: Bounds, depth: number): Tile[] {
+		return this.layTilesFromCorners(this.cornerTiles(view, depth));
+	}
+
+	public layTilesFromCorners(cornerTiles: ViewCornerTiles): Tile[] {
 		const tiles: Tile[] = [];
 		const tileWidthUnits = this.tileUnitSizeFromDepthLevel(cornerTiles.depth);
 

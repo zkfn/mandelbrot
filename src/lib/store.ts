@@ -45,6 +45,11 @@ class TileTimeWheel {
 		return this.prune();
 	}
 
+	public clear() {
+		this.ages.clear();
+		this.slots.length = 0;
+	}
+
 	private prune(): TileId[] {
 		const pruned: TileId[] = [];
 
@@ -70,7 +75,7 @@ class TileTimeWheel {
 	}
 }
 
-export class TileStore<Payload = unknown> {
+export class TileStore<Payload> {
 	private tiles: Map<TileId, TileRecord<Payload>>;
 	private timeWheel: TileTimeWheel;
 
@@ -113,9 +118,9 @@ export class TileStore<Payload = unknown> {
 		} else if (tile.state != TileState.RENDERING) {
 			throw new Error(`Readying a tile that is not rendering: ${tileId}.`);
 		} else {
+			this.timeWheel.touch(tileId);
 			tile.state = TileState.READY;
 			tile.payload = payload;
-			this.timeWheel.touch(tileId);
 		}
 	}
 
@@ -123,5 +128,10 @@ export class TileStore<Payload = unknown> {
 		for (const id of this.timeWheel.tick()) {
 			this.tiles.delete(id);
 		}
+	}
+
+	public clear() {
+		this.tiles.clear();
+		this.timeWheel.clear();
 	}
 }
