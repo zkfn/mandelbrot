@@ -1,16 +1,22 @@
-import { tileId, TileState, type Tile } from "@common/tiles";
-import { TileStore } from "@lib/store";
+import { tileId, type Tile } from "@common/tiles";
+import { TileState, TileStore } from "@lib/store";
 import { WorkerExecutorQueue } from "./queue";
 import { ReadAndClearFlag } from "@common/flag";
 import { TileSetter, type ViewCornerTiles } from "./tiles";
 import type { Camera } from "./camera";
 import type { Plane } from "@common/types";
+import type { TileJobResult } from "./jobs";
+
+// TODO move this into own files
+interface BitmapTileResult extends TileJobResult {
+	bitmap: ImageBitmap;
+}
 
 export class TilePainter {
 	private resolution: number = 128;
 
-	private readonly store: TileStore<ImageBitmap>;
-	private readonly queue: WorkerExecutorQueue<ArrayBuffer, ImageBitmap>;
+	private readonly store: TileStore<BitmapTileResult>;
+	private readonly queue: WorkerExecutorQueue<ArrayBuffer, BitmapTileResult>;
 	private readonly dirtyFlag: ReadAndClearFlag;
 	private readonly camera: Camera;
 	private readonly canvas: HTMLCanvasElement;
@@ -27,7 +33,7 @@ export class TilePainter {
 
 		this.ctx = ctx;
 		this.canvas = canvas;
-		this.store = new TileStore();
+		this.store = new TileStore(15000, 10, 100);
 		this.dirtyFlag = new ReadAndClearFlag(true);
 		this.tileSetter = new TileSetter(plane);
 		this.previousCorners = null;
@@ -37,10 +43,14 @@ export class TilePainter {
 			this.store,
 			this.dirtyFlag,
 			4,
-			(item, tile) => {
+			async (item, tile) => {
 				const rgba = new Uint8ClampedArray(item);
 				const img = new ImageData(rgba, tile.rect.width, tile.rect.height);
-				return createImageBitmap(img);
+				const bitmap = await createImageBitmap(img);
+				return {
+					tileId: tileId(tile),
+					bitmap,
+				};
 			},
 		);
 		this.camera = camera;
@@ -68,9 +78,9 @@ export class TilePainter {
 		this.paintTiles(tiles);
 	}
 
-	public clear() {
+	public dispose() {
 		this.queue.dispose();
-		this.store.clear();
+		this.store.dispose();
 		this.previousCorners = null;
 	}
 
@@ -104,7 +114,7 @@ export class TilePainter {
 	}
 
 	private paintTile = (tile: Tile) => {
-		const record = this.store.getTileRecord(tileId(tile));
+		const record = this.store.getTile(tileId(tile));
 
 		if (record && record.state == TileState.READY) {
 			const left = Math.round(this.camera.planeXToCamera(tile.section.minX));
@@ -118,7 +128,7 @@ export class TilePainter {
 			// ensure the worker rendered this exact size (device pixels)
 			// i.e., when you queued the job: texels = w, height = h
 
-			this.ctx.drawImage(record.payload!, left, top, w, h);
+			this.ctx.drawImage(record.payload.bitmap, left, top, w, h);
 
 			// TODO make the old code reusable in some "debug mode"
 			// const color = this.tileColor(record.state);
@@ -161,7 +171,7 @@ export class TilePainter {
 	private prepareTiles(tiles: Tile[]) {
 		for (const tile of tiles) {
 			const tid = tileId(tile);
-			const record = this.store.getTileRecord(tid);
+			const record = this.store.getTile(tid);
 
 			if (!record || record.state == TileState.QUEUED) {
 				this.store.setQueued(tid);

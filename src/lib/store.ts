@@ -1,113 +1,157 @@
-import { TileState, type TileId } from "@common/tiles";
+import { type TileId } from "@common/tiles";
+import type { TileJobResult } from "./jobs";
 
-export interface TileRecord<Payload = unknown> {
-	state: TileState;
-	payload?: Payload;
+export enum TileState {
+	QUEUED,
+	RENDERING,
+	READY,
 }
 
-// TODO Can be generic
-class TileTimeWheel {
-	private slots: Array<Set<TileId>>;
-	private ages: Map<TileId, number>;
-	private totalItems: number;
-	private readonly maxAge: number;
-	private readonly minAge: number;
-	private readonly maxItems: number;
+type TileRecordWithoutPayload = {
+	state: TileState.QUEUED | TileState.RENDERING;
+};
 
-	public constructor(maxAge: number, minAge: number, maxItems: number) {
-		this.maxAge = maxAge;
+type TileRecordWithPayload<Payload extends TileJobResult> = {
+	state: TileState.READY;
+	payload: Payload;
+};
+
+export type TileRecord<Payload extends TileJobResult> =
+	| TileRecordWithoutPayload
+	| TileRecordWithPayload<Payload>;
+
+class TimeWheel<Key extends string | number | symbol> {
+	private slots: Array<Set<Key>>;
+	private ages: Map<Key, number>;
+	private rememberedItems: number;
+
+	/** Value 0 (or less) means there is no max age */
+	public maxAge: number;
+	public minAge: number;
+	public maxItems: number;
+
+	public constructor(maxItems: number, minAge: number, maxAge: number) {
 		this.minAge = minAge;
+		this.maxAge = maxAge;
 		this.maxItems = maxItems;
 
-		this.slots = [new Set()];
 		this.ages = new Map();
-		this.totalItems = 0;
+		this.slots = [new Set()];
+		this.rememberedItems = 0;
 	}
 
-	public touch(tile: TileId) {
-		const age = this.ages.get(tile);
+	public touch(key: Key): void {
+		const age = this.ages.get(key);
 
 		if (age == undefined) {
-			this.totalItems += 1;
+			this.rememberedItems += 1;
 		} else {
-			this.slots[age].delete(tile);
+			this.slots[age].delete(key);
 		}
 
-		this.ages.set(tile, 0);
-		this.slots[0].add(tile);
+		this.ages.set(key, 0);
+		this.slots[0].add(key);
 	}
 
-	public tick(): TileId[] {
-		for (const [tileId, age] of this.ages) {
-			this.ages.set(tileId, age + 1);
+	public tick(): void {
+		for (const [key, age] of this.ages) {
+			this.ages.set(key, age + 1);
 		}
 
 		this.slots.unshift(new Set());
-		return this.prune();
 	}
 
-	public clear() {
-		this.ages.clear();
+	public dispose(): void {
 		this.slots.length = 0;
+		this.ages.clear();
 	}
 
-	private prune(): TileId[] {
-		const pruned: TileId[] = [];
+	public prune(): Key[] {
+		const pruned: Key[] = [];
 
-		while (
-			this.slots.length >= this.maxAge ||
-			(this.totalItems > this.maxItems && this.slots.length >= this.minAge)
-		) {
-			pruned.push(...this.popSlot());
+		while (this.shouldPop()) {
+			const poped = this.slots.pop()!;
+			this.rememberedItems -= poped.size;
+
+			for (const key of poped) {
+				this.ages.delete(key);
+			}
+
+			pruned.push(...poped);
 		}
 
 		return pruned;
 	}
 
-	private popSlot(): Set<TileId> {
-		const poped = this.slots.pop()!;
-		this.totalItems -= poped.size;
+	public size(): number {
+		return this.rememberedItems;
+	}
 
-		for (const tileId of poped) {
-			this.ages.delete(tileId);
-		}
+	private shouldPop(): boolean {
+		if (this.isTooOld()) return true;
+		if (this.isOldEnough()) return this.isOverLimit();
+		else return false;
+	}
 
-		return poped;
+	private isTooOld(): boolean {
+		if (this.maxAge <= 0) return false;
+		return this.slots.length >= this.maxAge;
+	}
+
+	private isOverLimit(): boolean {
+		return this.rememberedItems > this.maxItems;
+	}
+
+	private isOldEnough(): boolean {
+		return this.slots.length >= this.minAge;
 	}
 }
 
-export class TileStore<Payload> {
+export class TileStore<Payload extends TileJobResult> {
 	private tiles: Map<TileId, TileRecord<Payload>>;
-	private timeWheel: TileTimeWheel;
+	private timeWheel: TimeWheel<TileId>;
 
-	public constructor() {
+	public constructor(storeSize: number, minAge: number, maxAge: number = 0) {
 		this.tiles = new Map();
-		this.timeWheel = new TileTimeWheel(1000, 10, 15000);
+		this.timeWheel = new TimeWheel(storeSize, minAge, maxAge);
 	}
 
-	public getTileRecord(tileId: TileId): TileRecord<Payload> | undefined {
+	public setMaxAge(maxAge: number): void {
+		this.timeWheel.maxAge = maxAge;
+		this.prune();
+	}
+
+	public setMaxSize(maxSize: number): void {
+		this.timeWheel.maxItems = maxSize;
+		this.prune();
+	}
+
+	public prune() {
+		for (const tileId of this.timeWheel.prune()) {
+			this.tiles.delete(tileId);
+		}
+	}
+
+	public dispose() {
+		this.tiles.clear();
+		this.timeWheel.dispose();
+	}
+
+	public size(): number {
+		return this.timeWheel.size();
+	}
+
+	public getTile(tileId: TileId): TileRecord<Payload> | undefined {
 		return this.tiles.get(tileId);
 	}
 
 	public setQueued(tileId: TileId) {
-		const tile = this.tiles.get(tileId);
+		const record = this.tiles.get(tileId);
 
-		if (!tile) {
+		if (!record) {
 			this.tiles.set(tileId, { state: TileState.QUEUED });
-		} else if (tile.state != TileState.QUEUED) {
+		} else if (record.state != TileState.QUEUED) {
 			throw new Error(`Enqueueing a tile that is in the store: ${tileId}.`);
-		}
-	}
-
-	public resetFailedTileToQueue(tileId: TileId) {
-		const tile = this.tiles.get(tileId);
-
-		if (!tile) {
-			throw new Error(`Reseting a tile that is not in the store: ${tileId}.`);
-		} else if (tile.state != TileState.RENDERING) {
-			throw new Error(`Reseting a tile that is not rendering: ${tileId}.`);
-		} else {
-			this.tiles.set(tileId, { state: TileState.QUEUED });
 		}
 	}
 
@@ -132,20 +176,22 @@ export class TileStore<Payload> {
 			throw new Error(`Readying a tile that is not rendering: ${tileId}.`);
 		} else {
 			this.timeWheel.touch(tileId);
-			tile.state = TileState.READY;
-			tile.payload = payload;
+			this.tiles.set(tileId, {
+				state: TileState.READY,
+				payload,
+			});
 		}
 	}
 
-	public prune() {
-		for (const id of this.timeWheel.tick()) {
-			this.tiles.delete(id);
-		}
-	}
+	public resetFailedTileToQueue(tileId: TileId) {
+		const tile = this.tiles.get(tileId);
 
-	// TODO rename
-	public clear() {
-		this.tiles.clear();
-		this.timeWheel.clear();
+		if (!tile) {
+			throw new Error(`Reseting a tile that is not in the store: ${tileId}.`);
+		} else if (tile.state != TileState.RENDERING) {
+			throw new Error(`Reseting a tile that is not rendering: ${tileId}.`);
+		} else {
+			this.tiles.set(tileId, { state: TileState.QUEUED });
+		}
 	}
 }

@@ -66,7 +66,7 @@ export class PlaneGridHandler {
 		this.unhookFromDPR();
 
 		this.canvas = null!;
-		this.tilePainter.clear();
+		this.tilePainter.dispose();
 		this.rafNumber = 0;
 	}
 

@@ -6,12 +6,6 @@ export const tileId = (tile: Tile): string => {
 
 export type TileId = string;
 
-export enum TileState {
-	QUEUED,
-	RENDERING,
-	READY,
-}
-
 export interface TileKey {
 	depth: number;
 	ix: number;
