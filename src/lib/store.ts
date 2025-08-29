@@ -98,6 +98,18 @@ export class TileStore<Payload> {
 		}
 	}
 
+	public resetFailedTileToQueue(tileId: TileId) {
+		const tile = this.tiles.get(tileId);
+
+		if (!tile) {
+			throw new Error(`Reseting a tile that is not in the store: ${tileId}.`);
+		} else if (tile.state != TileState.RENDERING) {
+			throw new Error(`Reseting a tile that is not rendering: ${tileId}.`);
+		} else {
+			this.tiles.set(tileId, { state: TileState.QUEUED });
+		}
+	}
+
 	public setRendering(tileId: TileId) {
 		const tile = this.tiles.get(tileId);
 
@@ -130,6 +142,7 @@ export class TileStore<Payload> {
 		}
 	}
 
+	// TODO rename
 	public clear() {
 		this.tiles.clear();
 		this.timeWheel.clear();

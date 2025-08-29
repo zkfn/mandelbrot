@@ -22,6 +22,7 @@ export class WorkerExecutorQueue<Payload, StorePayload> {
 	private jobSeq: JobId;
 	private convert: (item: Payload, tile: Tile) => Promise<StorePayload>;
 
+	// TODO too complicate, we can map workers direclty to jobs.
 	private readonly assignedJobs: Map<JobId, AssignedJobRecord>;
 	private readonly assignedWorkers: Map<WorkerId, JobId>;
 
@@ -130,11 +131,18 @@ export class WorkerExecutorQueue<Payload, StorePayload> {
 		worker: Worker,
 		error: ErrorEvent,
 	): void {
-		const assignedJob = this.assignedWorkers.get(workerId);
+		const jobId = this.assignedWorkers.get(workerId);
 
-		if (assignedJob !== undefined) {
+		if (jobId !== undefined) {
+			const assignedJob = this.assignedJobs.get(jobId);
+
 			this.assignedWorkers.delete(workerId);
-			this.assignedJobs.delete(assignedJob);
+			this.assignedJobs.delete(jobId);
+
+			if (assignedJob !== undefined) {
+				this.enqueue(assignedJob.tile);
+				this.store.resetFailedTileToQueue(assignedJob.tileId);
+			}
 		}
 
 		console.error("Worker failed", error);
