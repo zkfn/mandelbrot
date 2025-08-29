@@ -117,9 +117,8 @@ export class WorkerExecutorQueue<Payload, StorePayload> {
 
 			this.convert(message.payload, message.tile).then((value) => {
 				this.store.setReady(tileId(message.tile), value);
+				this.dirtyFlag.set();
 			});
-
-			this.dirtyFlag.set();
 		}
 
 		this.idle.push(workerId);
