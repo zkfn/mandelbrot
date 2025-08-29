@@ -4,7 +4,7 @@ function App() {
 	return (
 		<GridViewer
 			plane={{
-				center: [0, 0],
+				center: [-0.5, 0],
 				side: 4,
 			}}
 		/>

@@ -1,15 +1,16 @@
-import { TileState, type Tile } from "@common/tiles";
+import { tileId, TileState, type Tile } from "@common/tiles";
 import { TileStore } from "@lib/store";
 import { WorkerExecutorQueue } from "./queue";
 import { ReadAndClearFlag } from "@common/flag";
 import { TileSetter, type ViewCornerTiles } from "./tiles";
 import type { Camera } from "./camera";
 import type { Plane } from "@common/types";
-import { boundsToRect } from "@common/utils";
 
 export class TilePainter {
-	private readonly store: TileStore<null>;
-	private readonly queue: WorkerExecutorQueue<null>;
+	private resolution: number = 128;
+
+	private readonly store: TileStore<ImageBitmap>;
+	private readonly queue: WorkerExecutorQueue<ArrayBuffer, ImageBitmap>;
 	private readonly dirtyFlag: ReadAndClearFlag;
 	private readonly camera: Camera;
 	private readonly canvas: HTMLCanvasElement;
@@ -32,7 +33,16 @@ export class TilePainter {
 		this.previousCorners = null;
 
 		// TODO determine worker size
-		this.queue = new WorkerExecutorQueue<null>(this.store, this.dirtyFlag, 8);
+		this.queue = new WorkerExecutorQueue(
+			this.store,
+			this.dirtyFlag,
+			4,
+			(item, tile) => {
+				const rgba = new Uint8ClampedArray(item);
+				const img = new ImageData(rgba, tile.rect.width, tile.rect.height);
+				return createImageBitmap(img);
+			},
+		);
 		this.camera = camera;
 	}
 
@@ -44,7 +54,7 @@ export class TilePainter {
 		if (!this.dirtyFlag.readAndClear()) return;
 		this.clearCanvas();
 
-		const depth = this.camera.optimalDepthLevelPerResolution(256);
+		const depth = this.camera.optimalDepthLevelPerResolution(this.resolution);
 		const bounds = this.camera.viewportBounds();
 		const corners = this.tileSetter.cornerTiles(bounds, depth);
 		const tiles = this.determineVisibleTiles(depth);
@@ -68,15 +78,23 @@ export class TilePainter {
 		return [
 			...this.tileSetter.layTilesFromViewBounds(
 				this.camera.viewportBounds(),
+				depth - 3,
+				this.resolution,
+			),
+			...this.tileSetter.layTilesFromViewBounds(
+				this.camera.viewportBounds(),
 				depth - 2,
+				this.resolution,
 			),
 			...this.tileSetter.layTilesFromViewBounds(
 				this.camera.viewportBounds(),
 				depth - 1,
+				this.resolution,
 			),
 			...this.tileSetter.layTilesFromViewBounds(
 				this.camera.viewportBounds(),
 				depth,
+				this.resolution,
 			),
 		];
 	}
@@ -86,28 +104,42 @@ export class TilePainter {
 	}
 
 	private paintTile = (tile: Tile) => {
-		const record = this.store.getTileRecord(tile.key.id());
+		const record = this.store.getTileRecord(tileId(tile));
 
-		if (record && record.state != TileState.QUEUED) {
-			const color = this.tileColor(record.state);
-			if (color === undefined) return;
+		if (record && record.state == TileState.READY) {
+			const left = Math.round(this.camera.planeXToCamera(tile.section.minX));
+			const right = Math.round(this.camera.planeXToCamera(tile.section.maxX));
+			const top = Math.round(this.camera.planeYToCamera(tile.section.minY));
+			const bottom = Math.round(this.camera.planeYToCamera(tile.section.maxY));
 
-			const camBounds = this.camera.planeBoundsToCamera(tile.section);
+			const w = right - left;
+			const h = bottom - top;
 
-			const { minX, minY } = camBounds;
-			const { width, height } = boundsToRect(camBounds);
+			// ensure the worker rendered this exact size (device pixels)
+			// i.e., when you queued the job: texels = w, height = h
 
-			this.ctx.fillStyle = color;
-			this.ctx.fillRect(minX, minY, width, height);
-			this.ctx.strokeRect(minX, minY, width, height);
+			this.ctx.drawImage(record.payload!, left, top, w, h);
+
+			// TODO make the old code reusable in some "debug mode"
+			// const color = this.tileColor(record.state);
+			// if (color === undefined) return;
+			//
+			// const camBounds = this.camera.planeBoundsToCamera(tile.section);
+			//
+			// const { minX, minY } = camBounds;
+			// const { width, height } = boundsToRect(camBounds);
+			//
+			// this.ctx.fillStyle = color;
+			// this.ctx.fillRect(minX, minY, width, height);
+			// this.ctx.strokeRect(minX, minY, width, height);
 		}
 	};
 
-	private tileColor(state: TileState): string | undefined {
-		if (state === TileState.READY) return "#0f0";
-		if (state === TileState.RENDERING) return "#ff4";
-		else return undefined;
-	}
+	// private tileColor(state: TileState): string | undefined {
+	// 	if (state === TileState.READY) return "#0f0";
+	// 	if (state === TileState.RENDERING) return "#ff4";
+	// 	else return undefined;
+	// }
 
 	private clearCanvas() {
 		this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -128,10 +160,11 @@ export class TilePainter {
 
 	private prepareTiles(tiles: Tile[]) {
 		for (const tile of tiles) {
-			const record = this.store.getTileRecord(tile.key.id());
+			const tid = tileId(tile);
+			const record = this.store.getTileRecord(tid);
 
 			if (!record || record.state == TileState.QUEUED) {
-				this.store.setQueued(tile.key.id());
+				this.store.setQueued(tid);
 				this.queue.enqueue(tile);
 			}
 		}

@@ -1,8 +1,9 @@
 import { TileStore } from "@lib/store";
-import DummyWorker from "@workers/dummy.ts?worker";
+// import DummyWorker from "@workers/dummy.ts?worker";
+import MandelbrotWorker from "@workers/mandelbrot.ts?worker";
 import type { ReadAndClearFlag } from "@common/flag";
-import type { WorkerOutMessage } from "@common/protocol";
-import type { Tile, TileId } from "@common/tiles";
+import type { WorkerOutMessage, WorkerInMessage } from "@common/protocol";
+import { tileId, type Tile, type TileId } from "@common/tiles";
 
 type JobId = number;
 type WorkerId = number;
@@ -14,11 +15,12 @@ interface AssignedJobRecord {
 	worker: Worker;
 }
 
-export class WorkerExecutorQueue<Payload> {
+export class WorkerExecutorQueue<Payload, StorePayload> {
 	private disposed = false;
 	private tileQueue: Tile[];
 
 	private jobSeq: JobId;
+	private convert: (item: Payload, tile: Tile) => Promise<StorePayload>;
 
 	private readonly assignedJobs: Map<JobId, AssignedJobRecord>;
 	private readonly assignedWorkers: Map<WorkerId, JobId>;
@@ -28,16 +30,18 @@ export class WorkerExecutorQueue<Payload> {
 
 	private readonly poolSize: number;
 	private readonly dirtyFlag: ReadAndClearFlag;
-	private readonly store: TileStore<Payload>;
+	private readonly store: TileStore<StorePayload>;
 
 	constructor(
-		store: TileStore<Payload>,
+		store: TileStore<StorePayload>,
 		dirtyFlag: ReadAndClearFlag,
 		poolSize: number = 8,
+		convert: (item: Payload, tile: Tile) => Promise<StorePayload>,
 	) {
 		this.jobSeq = 0;
 		this.poolSize = poolSize;
 		this.dirtyFlag = dirtyFlag;
+		this.convert = convert;
 		this.store = store;
 
 		this.assignedJobs = new Map();
@@ -48,7 +52,7 @@ export class WorkerExecutorQueue<Payload> {
 		this.tileQueue = [];
 
 		for (let workerId = 0; workerId < this.poolSize; workerId++) {
-			const worker = new DummyWorker();
+			const worker = new MandelbrotWorker();
 			this.registerWorker(workerId, worker);
 		}
 	}
@@ -111,7 +115,10 @@ export class WorkerExecutorQueue<Payload> {
 			this.assignedJobs.delete(message.jobId);
 			this.assignedWorkers.delete(workerId);
 
-			this.store.setReady(message.tileId, message.payload);
+			this.convert(message.payload, message.tile).then((value) => {
+				this.store.setReady(tileId(message.tile), value);
+			});
+
 			this.dirtyFlag.set();
 		}
 
@@ -136,7 +143,7 @@ export class WorkerExecutorQueue<Payload> {
 		try {
 			worker.terminate();
 		} finally {
-			const replacement = new DummyWorker();
+			const replacement = new MandelbrotWorker();
 			this.registerWorker(workerId, replacement);
 			this.pump();
 		}
@@ -151,21 +158,25 @@ export class WorkerExecutorQueue<Payload> {
 
 			const workerId = this.idle.pop()!;
 			const jobId = this.jobSeq;
-			const tileId = tile.key.id();
+			const tid = tileId(tile);
 
 			const worker = this.workers[workerId];
 
-			this.store.setRendering(tile.key.id());
-
+			this.store.setRendering(tid);
 			this.assignedWorkers.set(workerId, jobId);
 			this.assignedJobs.set(jobId, {
 				jobId,
 				worker,
 				tile,
-				tileId,
+				tileId: tid,
 			});
 
-			worker.postMessage({ jobId, tile, tileId: tile.key.id() });
+			worker.postMessage({
+				jobId,
+				tile,
+				tileId: tid,
+				maxIter: 1500,
+			} as WorkerInMessage);
 
 			// TODO this should be removed on prod
 			this.dirtyFlag.set();

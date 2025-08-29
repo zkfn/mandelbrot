@@ -1,4 +1,8 @@
-import type { Bounds } from "@common/types";
+import type { Bounds, Rect } from "@common/types";
+
+export const tileId = (tile: Tile): string => {
+	return `${tile.key.depth}:${tile.key.ix}:${tile.key.iy}`;
+};
 
 export type TileId = string;
 
@@ -8,21 +12,14 @@ export enum TileState {
 	READY,
 }
 
-export class TileKey {
-	public constructor(
-		public depth: number,
-		public ix: number,
-		public iy: number,
-	) {}
-
-	public id(): TileId {
-		return `${this.depth}:${this.ix}:${this.iy}`;
-	}
+export interface TileKey {
+	depth: number;
+	ix: number;
+	iy: number;
 }
 
-export class Tile {
-	public constructor(
-		public section: Bounds,
-		public key: TileKey,
-	) {}
+export interface Tile {
+	section: Bounds;
+	rect: Rect;
+	key: TileKey;
 }

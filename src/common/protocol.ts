@@ -1,13 +1,13 @@
-import { Tile, type TileId } from "@common/tiles";
+import type { Tile } from "@common/tiles";
 
 export type WorkerInMessage = {
 	jobId: number;
-	tileId: TileId;
 	tile: Tile;
+	maxIter?: number;
 };
 
 export type WorkerOutMessage<Payload> = {
 	jobId: number;
-	tileId: string;
+	tile: Tile;
 	payload: Payload;
 };
