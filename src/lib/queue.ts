@@ -1,3 +1,5 @@
+// TODO this file could use a lot of renaming
+
 import { TileStore } from "@lib/store";
 // import DummyWorker from "@workers/dummy.ts?worker";
 import MandelbrotWorker from "@workers/mandelbrot.ts?worker";
@@ -15,6 +17,7 @@ interface AssignedJobRecord {
 	worker: Worker;
 }
 
+// TODO maybe job queue?
 export class WorkerExecutorQueue<Payload, StorePayload> {
 	private disposed = false;
 	private tileQueue: Tile[];

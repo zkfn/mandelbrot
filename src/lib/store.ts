@@ -5,6 +5,7 @@ export interface TileRecord<Payload = unknown> {
 	payload?: Payload;
 }
 
+// TODO Can be generic
 class TileTimeWheel {
 	private slots: Array<Set<TileId>>;
 	private ages: Map<TileId, number>;
