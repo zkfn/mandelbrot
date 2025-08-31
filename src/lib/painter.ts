@@ -1,22 +1,27 @@
 import { tileId, type Tile } from "@common/tiles";
 import { TileState, TileStore } from "@lib/store";
-import { WorkerExecutorQueue } from "./queue";
+import { JobQueue } from "./queue";
 import { ReadAndClearFlag } from "@common/flag";
 import { TileSetter, type ViewCornerTiles } from "./tiles";
 import type { Camera } from "./camera";
 import type { Plane } from "@common/types";
-import type { TileJobResult } from "./jobs";
-
-// TODO move this into own files
-interface BitmapTileResult extends TileJobResult {
-	bitmap: ImageBitmap;
-}
+import {
+	TSSupervisor,
+	type BitmapTileResult,
+	type TSJobAssignment,
+} from "./supervisors/ts-supervisor";
+import type { WorkerOutMessage, WorkerInMessage } from "@common/protocol";
 
 export class TilePainter {
 	private resolution: number = 128;
 
 	private readonly store: TileStore<BitmapTileResult>;
-	private readonly queue: WorkerExecutorQueue<ArrayBuffer, BitmapTileResult>;
+	private readonly queue: JobQueue<
+		WorkerInMessage,
+		WorkerOutMessage<ArrayBuffer>,
+		TSJobAssignment,
+		BitmapTileResult
+	>;
 	private readonly dirtyFlag: ReadAndClearFlag;
 	private readonly camera: Camera;
 	private readonly canvas: HTMLCanvasElement;
@@ -38,21 +43,7 @@ export class TilePainter {
 		this.tileSetter = new TileSetter(plane);
 		this.previousCorners = null;
 
-		// TODO determine worker size
-		this.queue = new WorkerExecutorQueue(
-			this.store,
-			this.dirtyFlag,
-			4,
-			async (item, tile) => {
-				const rgba = new Uint8ClampedArray(item);
-				const img = new ImageData(rgba, tile.rect.width, tile.rect.height);
-				const bitmap = await createImageBitmap(img);
-				return {
-					tileId: tileId(tile),
-					bitmap,
-				};
-			},
-		);
+		this.queue = new JobQueue(new TSSupervisor(), this.store, 4);
 		this.camera = camera;
 	}
 
@@ -61,7 +52,11 @@ export class TilePainter {
 	}
 
 	public draw() {
-		if (!this.dirtyFlag.readAndClear()) return;
+		let dirty = this.queue.readAndClearDirtyness();
+		dirty = this.dirtyFlag.readAndClear() || dirty;
+
+		if (!dirty) return;
+
 		this.clearCanvas();
 
 		const depth = this.camera.optimalDepthLevelPerResolution(this.resolution);
@@ -70,7 +65,7 @@ export class TilePainter {
 		const tiles = this.determineVisibleTiles(depth);
 
 		if (!this.checkSameCorners(corners)) {
-			this.queue.clearQueue();
+			this.queue.prune();
 			this.prepareTiles(tiles);
 			this.store.prune();
 		}
@@ -175,7 +170,7 @@ export class TilePainter {
 
 			if (!record || record.state == TileState.QUEUED) {
 				this.store.setQueued(tid);
-				this.queue.enqueue(tile);
+				this.queue.enqueueEnd({ tile: tile, tileId: tid });
 			}
 		}
 	}

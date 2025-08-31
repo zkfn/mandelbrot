@@ -183,15 +183,17 @@ export class TileStore<Payload extends TileJobResult> {
 		}
 	}
 
-	public resetFailedTileToQueue(tileId: TileId) {
-		const tile = this.tiles.get(tileId);
+	public resetFailedTileToQueue(tileIds: TileId[]) {
+		tileIds.forEach((tileId) => {
+			const tile = this.tiles.get(tileId);
 
-		if (!tile) {
-			throw new Error(`Reseting a tile that is not in the store: ${tileId}.`);
-		} else if (tile.state != TileState.RENDERING) {
-			throw new Error(`Reseting a tile that is not rendering: ${tileId}.`);
-		} else {
-			this.tiles.set(tileId, { state: TileState.QUEUED });
-		}
+			if (!tile) {
+				throw new Error(`Reseting a tile that is not in the store: ${tileId}.`);
+			} else if (tile.state != TileState.RENDERING) {
+				throw new Error(`Reseting a tile that is not rendering: ${tileId}.`);
+			} else {
+				this.tiles.set(tileId, { state: TileState.QUEUED });
+			}
+		});
 	}
 }

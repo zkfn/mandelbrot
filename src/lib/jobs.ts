@@ -1,5 +1,5 @@
 import type { TileId } from "@common/tiles";
 
-export interface TileJobResult {
+export interface WithTID {
 	tileId: TileId;
 }

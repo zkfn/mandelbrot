@@ -1,196 +1,190 @@
-// TODO this file could use a lot of renaming
-
 import { TileStore } from "@lib/store";
-// import DummyWorker from "@workers/dummy.ts?worker";
-import MandelbrotWorker from "@workers/mandelbrot.ts?worker";
-import type { ReadAndClearFlag } from "@common/flag";
-import type { WorkerOutMessage, WorkerInMessage } from "@common/protocol";
-import { tileId, type Tile, type TileId } from "@common/tiles";
+import { ReadAndClearFlag } from "@common/flag";
+import type { Supervisor } from "./supervisor";
+import type { WithTID } from "./jobs";
 
-type JobId = number;
 type WorkerId = number;
 
-interface AssignedJobRecord {
-	jobId: JobId;
-	tileId: TileId;
-	tile: Tile;
-	worker: Worker;
-}
-
-// TODO maybe job queue?
-export class WorkerExecutorQueue<Payload, StorePayload> {
+export class JobQueue<
+	SendMessage,
+	ReceiveMessage,
+	Assignment extends WithTID,
+	Result extends WithTID,
+> {
+	private poolSize: number;
+	private hired: number;
 	private disposed = false;
-	private tileQueue: Tile[];
+	private jobQueue: Assignment[];
 
-	private jobSeq: JobId;
-	private convert: (item: Payload, tile: Tile) => Promise<StorePayload>;
+	private readonly dirtyOnJobEnd: boolean;
+	private readonly dirtyOnJobStart: boolean;
 
-	// TODO too complicate, we can map workers direclty to jobs.
-	private readonly assignedJobs: Map<JobId, AssignedJobRecord>;
-	private readonly assignedWorkers: Map<WorkerId, JobId>;
+	private readonly assignments: Map<WorkerId, Assignment>;
 
-	private readonly workers: Worker[];
+	private readonly workers: Map<WorkerId, Worker>;
 	private readonly idle: WorkerId[];
 
-	private readonly poolSize: number;
+	private readonly store: TileStore<Result>;
+	private readonly supervisor: Supervisor<
+		SendMessage,
+		ReceiveMessage,
+		Assignment,
+		Result
+	>;
 	private readonly dirtyFlag: ReadAndClearFlag;
-	private readonly store: TileStore<StorePayload>;
 
 	constructor(
-		store: TileStore<StorePayload>,
-		dirtyFlag: ReadAndClearFlag,
-		poolSize: number = 8,
-		convert: (item: Payload, tile: Tile) => Promise<StorePayload>,
+		supervisor: Supervisor<SendMessage, ReceiveMessage, Assignment, Result>,
+		store: TileStore<Result>,
+		poolSize: number,
+		dirtyOnJobEnd: boolean = false,
+		dirtyOnJobStart: boolean = true,
 	) {
-		this.jobSeq = 0;
-		this.poolSize = poolSize;
-		this.dirtyFlag = dirtyFlag;
-		this.convert = convert;
 		this.store = store;
+		this.supervisor = supervisor;
+		this.poolSize = poolSize;
 
-		this.assignedJobs = new Map();
-		this.assignedWorkers = new Map();
+		this.dirtyFlag = new ReadAndClearFlag(false);
+		this.dirtyOnJobEnd = dirtyOnJobEnd;
+		this.dirtyOnJobStart = dirtyOnJobStart;
 
-		this.workers = Array(poolSize);
+		this.assignments = new Map();
+		this.workers = new Map();
+
+		this.jobQueue = [];
 		this.idle = [];
-		this.tileQueue = [];
+		this.hired = 0;
 
-		for (let workerId = 0; workerId < this.poolSize; workerId++) {
-			const worker = new MandelbrotWorker();
-			this.registerWorker(workerId, worker);
-		}
+		this.hireWorkersUntilPoolSizeIsFilled();
 	}
 
-	public enqueue(tile: Tile) {
-		this.tileQueue.push(tile);
+	public setPoolSize(poolSize: number): void {
+		this.poolSize = poolSize;
+		this.hireWorkersUntilPoolSizeIsFilled();
 		this.pump();
 	}
 
-	public clearQueue() {
-		this.tileQueue.length = 0;
+	public readAndClearDirtyness(): boolean {
+		return this.dirtyFlag.readAndClear();
+	}
+
+	public enqueueEnd(...assignments: Assignment[]): void {
+		this.jobQueue.push(...assignments);
+		this.pump();
+	}
+
+	public enqueueStart(...assignments: Assignment[]): void {
+		this.jobQueue.unshift(...assignments);
+		this.pump();
+	}
+
+	public prune() {
+		this.jobQueue.length = 0;
 	}
 
 	public dispose(): void {
 		this.disposed = true;
-
-		this.assignedJobs.clear();
-		this.assignedWorkers.clear();
+		this.assignments.clear();
+		this.jobQueue.length = 0;
 
 		this.workers.forEach((worker) => {
+			this.hired -= 1;
 			try {
 				worker.terminate();
 			} catch {}
 		});
 
 		this.idle.length = 0;
-		this.workers.length = 0;
-		this.clearQueue();
-	}
-
-	private registerWorker(workerId: WorkerId, worker: Worker) {
-		worker.addEventListener("message", this.newDoneHandler(workerId));
-		worker.addEventListener("error", this.newErrorHandler(workerId, worker));
-
-		this.workers[workerId] = worker;
-		this.idle.push(workerId);
-	}
-
-	private newDoneHandler = (workerId: WorkerId) => {
-		return (event: MessageEvent<WorkerOutMessage<Payload>>) => {
-			this.handleDone(workerId, event.data);
-		};
-	};
-
-	private newErrorHandler = (workerId: WorkerId, worker: Worker) => {
-		return (error: ErrorEvent) => {
-			this.handleError(workerId, worker, error);
-		};
-	};
-
-	private handleDone = (
-		workerId: WorkerId,
-		message: WorkerOutMessage<Payload>,
-	) => {
-		if (this.disposed) return;
-
-		const record = this.assignedJobs.get(message.jobId);
-
-		if (record) {
-			this.assignedJobs.delete(message.jobId);
-			this.assignedWorkers.delete(workerId);
-
-			this.convert(message.payload, message.tile).then((value) => {
-				this.store.setReady(tileId(message.tile), value);
-				this.dirtyFlag.set();
-			});
-		}
-
-		this.idle.push(workerId);
-		this.pump();
-	};
-
-	private handleError(
-		workerId: WorkerId,
-		worker: Worker,
-		error: ErrorEvent,
-	): void {
-		const jobId = this.assignedWorkers.get(workerId);
-
-		if (jobId !== undefined) {
-			const assignedJob = this.assignedJobs.get(jobId);
-
-			this.assignedWorkers.delete(workerId);
-			this.assignedJobs.delete(jobId);
-
-			if (assignedJob !== undefined) {
-				this.enqueue(assignedJob.tile);
-				this.store.resetFailedTileToQueue(assignedJob.tileId);
-			}
-		}
-
-		console.error("Worker failed", error);
-
-		try {
-			worker.terminate();
-		} finally {
-			const replacement = new MandelbrotWorker();
-			this.registerWorker(workerId, replacement);
-			this.pump();
-		}
+		this.workers.clear();
 	}
 
 	private pump(): void {
 		if (this.disposed) return;
 
 		while (this.idle.length > 0) {
-			const tile = this.tileQueue.shift();
-			if (!tile) break;
+			const assignment = this.jobQueue.shift();
+			if (!assignment) break;
 
 			const workerId = this.idle.pop()!;
-			const jobId = this.jobSeq;
-			const tid = tileId(tile);
+			const worker = this.workers.get(workerId)!;
 
-			const worker = this.workers[workerId];
+			this.assignments.set(workerId, assignment);
+			this.store.setRendering(assignment.tileId);
 
-			this.store.setRendering(tid);
-			this.assignedWorkers.set(workerId, jobId);
-			this.assignedJobs.set(jobId, {
-				jobId,
-				worker,
-				tile,
-				tileId: tid,
-			});
-
-			worker.postMessage({
-				jobId,
-				tile,
-				tileId: tid,
-				maxIter: 1500,
-			} as WorkerInMessage);
-
-			// TODO this should be removed on prod
-			this.dirtyFlag.set();
-			this.jobSeq += 1;
+			worker.postMessage(this.supervisor.assignWorker(assignment));
+			if (this.dirtyOnJobStart) this.dirtyFlag.set();
 		}
+	}
+
+	private hireWorkersUntilPoolSizeIsFilled() {
+		for (let workerId = this.hired; workerId < this.poolSize; workerId++) {
+			this.registerWorker(workerId, this.supervisor.hireWorker());
+			this.hired += 1;
+		}
+	}
+
+	private registerWorker(workerId: WorkerId, worker: Worker) {
+		worker.addEventListener("message", this.newDoneHandler(workerId));
+		worker.addEventListener("error", this.newErrorHandler(workerId));
+
+		this.workers.set(workerId, worker);
+		this.idle.push(workerId);
+	}
+
+	private newDoneHandler = (workerId: WorkerId) => {
+		return (event: MessageEvent<ReceiveMessage>) => {
+			this.handleDone(workerId, event.data);
+		};
+	};
+
+	private newErrorHandler = (workerId: WorkerId) => {
+		return (error: ErrorEvent) => {
+			this.handleError(workerId, error);
+		};
+	};
+
+	private handleDone = (workerId: WorkerId, message: ReceiveMessage) => {
+		if (this.disposed) return;
+
+		if (this.assignments.get(workerId)) {
+			this.assignments.delete(workerId);
+
+			this.supervisor.collectResult(message).then((value) => {
+				this.store.setReady(value.tileId, value);
+				if (this.dirtyOnJobEnd) this.dirtyFlag.set();
+			});
+		}
+
+		if (workerId <= this.poolSize) {
+			this.idle.push(workerId);
+			this.pump();
+		} else {
+			this.workers.delete(workerId);
+			this.hired -= 1;
+		}
+	};
+
+	private handleError = (workerId: WorkerId, error: ErrorEvent): void => {
+		const assignment = this.assignments.get(workerId);
+
+		console.error("Worker failed", error);
+
+		try {
+			this.workers.get(workerId)!.terminate();
+		} finally {
+			const replacement = this.supervisor.hireWorker();
+
+			this.registerWorker(workerId, replacement);
+
+			if (assignment !== undefined) {
+				this.assignments.delete(workerId);
+				this.redoUnfinishedJobs(assignment);
+			}
+		}
+	};
+
+	private redoUnfinishedJobs(...assignments: Assignment[]) {
+		this.store.resetFailedTileToQueue(assignments.map((a) => a.tileId));
+		this.enqueueStart(...assignments);
 	}
 }
