@@ -31,7 +31,7 @@ export class JobQueue<
 		Assignment,
 		Result
 	>;
-	private readonly dirtyFlag: ReadAndClearFlag;
+	public readonly dirtyFlag: ReadAndClearFlag;
 
 	constructor(
 		supervisor: Supervisor<SendMessage, ReceiveMessage, Assignment, Result>,
@@ -62,10 +62,6 @@ export class JobQueue<
 		this.poolSize = poolSize;
 		this.hireWorkersUntilPoolSizeIsFilled();
 		this.pump();
-	}
-
-	public readAndClearDirtyness(): boolean {
-		return this.dirtyFlag.readAndClear();
 	}
 
 	public enqueueEnd(...assignments: Assignment[]): void {

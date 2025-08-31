@@ -1,3 +1,4 @@
+import { ReadAndClearFlag } from "@common/flag";
 import type { Bounds, Plane, Rect } from "@common/types";
 import { boundsToRect, clamp, planeToBounds, rect } from "@common/utils";
 import { Viewport } from "@lib/viewport";
@@ -9,13 +10,16 @@ export class Camera {
 
 	private curUPP: number;
 	private maxUPP: number;
+
 	private readonly minUPP: number;
 	private readonly viewport: Viewport;
+	public readonly dirtyFlag: ReadAndClearFlag;
 
 	public constructor(plane: Plane) {
 		this.viewport = new Viewport(plane);
 		this.planeSide = plane.side;
 		this.cameraRect = boundsToRect(planeToBounds(plane));
+		this.dirtyFlag = new ReadAndClearFlag(true);
 
 		// TODO find nice TH or solve the zoomed in jagging when panning
 		this.minUPP = 2 ** -52;
@@ -47,16 +51,19 @@ export class Camera {
 
 		this.ensureClampedUPP();
 		this.resizeViewport();
+		this.dirtyFlag.set();
 	}
 
 	public moveViewportByCameraPx(dx: number, dy: number) {
 		this.viewport.moveBy(dx * this.curUPP, dy * this.curUPP);
+		this.dirtyFlag.set();
 	}
 
 	public zoomViewportAtCameraPx(upp: number, x: number, y: number) {
 		const center = this.cameraCoordToPlane(x, y);
 		this.setUPP(upp);
 		this.resizeViewport(center);
+		this.dirtyFlag.set();
 	}
 
 	public adaptToDPR(dpr: number) {

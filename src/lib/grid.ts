@@ -1,10 +1,12 @@
 import { Camera } from "@lib/camera";
 import type { Plane } from "@common/types";
 import { TilePainter } from "./painter";
+import { Composer } from "./composer";
 
 export class PlaneGridHandler {
 	private zoomFactor = 0.001;
 	private plane: Plane;
+	private composer: Composer;
 	private rafNumber: number;
 
 	private camera: Camera;
@@ -25,6 +27,7 @@ export class PlaneGridHandler {
 		this.canvas = null!;
 		this.resizeObserver = null!;
 		this.dprQuery = null!;
+		this.composer = null!;
 
 		this.lastPanCoord = [0, 0];
 		this.isPanning = false;
@@ -33,7 +36,8 @@ export class PlaneGridHandler {
 
 	public attachToCanvas(canvas: HTMLCanvasElement) {
 		this.canvas = canvas;
-		this.tilePainter = new TilePainter(this.plane, canvas, this.camera);
+		this.tilePainter = new TilePainter(canvas);
+		this.composer = new Composer(this.plane, this.tilePainter, this.camera);
 		this.updateCanvasDimensions();
 
 		canvas.addEventListener("wheel", this.handleWheel, { passive: false });
@@ -66,12 +70,12 @@ export class PlaneGridHandler {
 		this.unhookFromDPR();
 
 		this.canvas = null!;
-		this.tilePainter.dispose();
+		this.composer.dispose();
 		this.rafNumber = 0;
 	}
 
 	private tick = () => {
-		this.tilePainter.draw();
+		this.composer.draw();
 		this.rafNumber = requestAnimationFrame(this.tick);
 	};
 
@@ -101,7 +105,6 @@ export class PlaneGridHandler {
 
 		this.camera.adaptToDPR(dpr);
 		this.camera.adaptToCanvas(this.canvas);
-		this.tilePainter.forceRedraw();
 	};
 
 	private handleMouseDown = (event: MouseEvent) => {
@@ -113,7 +116,6 @@ export class PlaneGridHandler {
 		);
 
 		this.setGrabbingPointerStyle();
-		this.tilePainter.forceRedraw();
 		this.isPanning = true;
 	};
 
@@ -132,7 +134,6 @@ export class PlaneGridHandler {
 		const dy = lastY - cameraY;
 
 		this.camera.moveViewportByCameraPx(dx, dy);
-		this.tilePainter.forceRedraw();
 	};
 
 	private handleMouseUp = () => {
@@ -154,8 +155,6 @@ export class PlaneGridHandler {
 			cameraX,
 			cameraY,
 		);
-
-		this.tilePainter.forceRedraw();
 	};
 
 	private setDefaultPointerStyle() {
