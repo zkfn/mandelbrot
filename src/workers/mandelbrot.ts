@@ -40,13 +40,13 @@ function renderMandelbrot(
 self.onmessage = (message: MessageEvent<WorkerInMessage>) => {
 	const data = message.data;
 
-	const width = Math.max(1, data.tile.rect.width || 0);
-	const height = Math.max(1, data.tile.rect.height || 0);
+	const width = Math.max(1, data.tile.resolution.width || 0);
+	const height = Math.max(1, data.tile.resolution.height || 0);
 	const maxIter = data.maxIter ?? 500;
 
 	const pixels = renderMandelbrot(data.tile.section, width, height, maxIter);
 	const out: WorkerOutMessage<ArrayBuffer> = {
-		jobId: data.jobId,
+		tileId: data.tileId,
 		tile: data.tile,
 		payload: pixels.buffer,
 	};

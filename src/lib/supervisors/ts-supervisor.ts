@@ -1,14 +1,13 @@
 import type { WorkerInMessage, WorkerOutMessage } from "@common/protocol";
-import { tileId, type Tile } from "@common/tiles";
-import type { WithTID } from "@lib/jobs";
-import type { Supervisor } from "@lib/supervisor";
+import type { Tile, WithTileId } from "@common/tiles";
+import type { Supervisor } from "@lib/supervisors/supervisor";
 import TSWorker from "@workers/mandelbrot?worker";
 
-export interface BitmapTileResult extends WithTID {
+export interface BitmapTileResult extends WithTileId {
 	bitmap: ImageBitmap;
 }
 
-export interface TSJobAssignment extends WithTID {
+export interface TSJobAssignment extends WithTileId {
 	tile: Tile;
 }
 
@@ -26,7 +25,7 @@ export class TSSupervisor
 	}
 
 	public assignWorker(job: TSJobAssignment): WorkerInMessage {
-		return { tile: job.tile };
+		return { tile: job.tile, tileId: job.tileId };
 	}
 
 	public async collectResult(
@@ -35,12 +34,12 @@ export class TSSupervisor
 		const rgba = new Uint8ClampedArray(message.payload);
 		const img = new ImageData(
 			rgba,
-			message.tile.rect.width,
-			message.tile.rect.height,
+			message.tile.resolution.width,
+			message.tile.resolution.height,
 		);
 		const bitmap = await createImageBitmap(img);
 		return {
-			tileId: tileId(message.tile),
+			tileId: message.tileId,
 			bitmap,
 		};
 	}

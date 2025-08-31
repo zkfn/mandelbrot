@@ -1,5 +1,4 @@
-import { type TileId } from "@common/tiles";
-import type { TileJobResult } from "./jobs";
+import { type TileId, type WithTileId } from "@common/tiles";
 
 export enum TileState {
 	QUEUED,
@@ -11,12 +10,12 @@ type TileRecordWithoutPayload = {
 	state: TileState.QUEUED | TileState.RENDERING;
 };
 
-type TileRecordWithPayload<Payload extends TileJobResult> = {
+type TileRecordWithPayload<Payload extends WithTileId> = {
 	state: TileState.READY;
 	payload: Payload;
 };
 
-export type TileRecord<Payload extends TileJobResult> =
+export type TileRecord<Payload extends WithTileId> =
 	| TileRecordWithoutPayload
 	| TileRecordWithPayload<Payload>;
 
@@ -107,7 +106,7 @@ class TimeWheel<Key extends string | number | symbol> {
 	}
 }
 
-export class TileStore<Payload extends TileJobResult> {
+export class TileStore<Payload extends WithTileId> {
 	private tiles: Map<TileId, TileRecord<Payload>>;
 	private timeWheel: TimeWheel<TileId>;
 

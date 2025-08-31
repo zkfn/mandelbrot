@@ -1,7 +1,7 @@
 import type { Bounds, Rect } from "@common/types";
 
-export const tileId = (tile: Tile): string => {
-	return `${tile.key.depth}:${tile.key.ix}:${tile.key.iy}`;
+export const tileKeyToId = (key: TileKey): TileId => {
+	return `${key.depth}:${key.ix}:${key.iy}`;
 };
 
 export type TileId = string;
@@ -14,6 +14,13 @@ export interface TileKey {
 
 export interface Tile {
 	section: Bounds;
-	rect: Rect;
+	resolution: Rect;
+}
+
+export interface TileWithKey extends Tile {
 	key: TileKey;
+}
+
+export interface WithTileId {
+	tileId: TileId;
 }

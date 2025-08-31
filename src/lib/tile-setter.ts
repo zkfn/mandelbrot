@@ -1,4 +1,4 @@
-import type { Tile, TileKey } from "@common/tiles";
+import type { TileKey, TileWithKey } from "@common/tiles";
 import type { Plane, Bounds } from "@common/types";
 
 export class ViewCornerTiles implements Bounds {
@@ -44,15 +44,15 @@ export class TileSetter {
 		view: Bounds,
 		depth: number,
 		resolution: number,
-	): Tile[] {
+	): TileWithKey[] {
 		return this.layTilesFromCorners(this.cornerTiles(view, depth), resolution);
 	}
 
 	public layTilesFromCorners(
 		cornerTiles: ViewCornerTiles,
 		resolution: number,
-	): Tile[] {
-		const tiles: Tile[] = [];
+	): TileWithKey[] {
+		const tiles: TileWithKey[] = [];
 		const tileWidthUnits = this.tileUnitSizeFromDepthLevel(cornerTiles.depth);
 
 		let minX;
@@ -70,9 +70,9 @@ export class TileSetter {
 				const section = { minX, maxX, minY, maxY };
 				const rect = { width: resolution, height: resolution, top: 0, left: 0 };
 
-				const tile: Tile = {
+				const tile: TileWithKey = {
 					section,
-					rect,
+					resolution: rect,
 					key,
 				};
 

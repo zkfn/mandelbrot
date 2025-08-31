@@ -32,12 +32,10 @@ export const boundsHeight = (bounds: Bounds): number => {
 
 export const rect = (init: Partial<Rect> | null = null): Rect => {
 	if (init == null) {
-		return { width: 0, height: 0, top: 0, left: 0 };
+		return { width: 0, height: 0 };
 	} else {
-		const { width, height, top, left } = init;
+		const { width, height } = init;
 		return {
-			left: left || 0,
-			top: top || 0,
 			width: width || 0,
 			height: height || 0,
 		};
@@ -46,8 +44,6 @@ export const rect = (init: Partial<Rect> | null = null): Rect => {
 
 export function boundsToRect(bounds: Bounds): Rect {
 	return {
-		left: bounds.minX,
-		top: bounds.minY,
 		width: boundsWidth(bounds),
 		height: boundsHeight(bounds),
 	};

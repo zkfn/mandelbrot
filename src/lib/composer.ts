@@ -1,15 +1,16 @@
-import { tileId, type Tile } from "@common/tiles";
+import { tileKeyToId, type TileWithKey } from "@common/tiles";
 import { TileState, TileStore } from "@lib/store";
 import { JobQueue } from "./queue";
 import { readAndClearMultiple } from "@common/flag";
-import { TileSetter, type ViewCornerTiles } from "./tiles";
-import type { Camera } from "./camera";
-import type { Plane } from "@common/types";
+import { TileSetter, type ViewCornerTiles } from "./tile-setter";
 import {
 	TSSupervisor,
 	type BitmapTileResult,
 	type TSJobAssignment,
 } from "./supervisors/ts-supervisor";
+
+import type { Camera } from "./camera";
+import type { Plane } from "@common/types";
 import type { WorkerOutMessage, WorkerInMessage } from "@common/protocol";
 import type { TilePainter } from "./painter";
 
@@ -66,7 +67,7 @@ export class Composer {
 		this.previousCorners = null;
 	}
 
-	private determineVisibleTiles(depth: number): Tile[] {
+	private determineVisibleTiles(depth: number): TileWithKey[] {
 		return [
 			...this.tileSetter.layTilesFromViewBounds(
 				this.camera.viewportBounds(),
@@ -91,9 +92,9 @@ export class Composer {
 		];
 	}
 
-	private paintTiles(tiles: Tile[]) {
+	private paintTiles(tiles: TileWithKey[]) {
 		for (const tile of tiles) {
-			const record = this.store.getTile(tileId(tile));
+			const record = this.store.getTile(tileKeyToId(tile.key));
 
 			if (record?.state == TileState.READY) {
 				const payload = record.payload;
@@ -104,12 +105,6 @@ export class Composer {
 		}
 	}
 
-	// private tileColor(state: TileState): string | undefined {
-	// 	if (state === TileState.READY) return "#0f0";
-	// 	if (state === TileState.RENDERING) return "#ff4";
-	// 	else return undefined;
-	// }
-
 	private checkSameCorners(corners: ViewCornerTiles): boolean {
 		if (!this.previousCorners || !this.previousCorners.isSameAs(corners)) {
 			this.previousCorners = corners;
@@ -119,9 +114,9 @@ export class Composer {
 		}
 	}
 
-	private prepareTiles(tiles: Tile[]) {
+	private prepareTiles(tiles: TileWithKey[]) {
 		for (const tile of tiles) {
-			const tid = tileId(tile);
+			const tid = tileKeyToId(tile.key);
 			const record = this.store.getTile(tid);
 
 			if (!record || record.state == TileState.QUEUED) {

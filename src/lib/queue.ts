@@ -1,15 +1,15 @@
 import { TileStore } from "@lib/store";
 import { ReadAndClearFlag } from "@common/flag";
-import type { Supervisor } from "./supervisor";
-import type { WithTID } from "./jobs";
+import type { Supervisor } from "@lib/supervisors/supervisor";
+import type { WithTileId } from "@common/tiles";
 
 type WorkerId = number;
 
 export class JobQueue<
 	SendMessage,
 	ReceiveMessage,
-	Assignment extends WithTID,
-	Result extends WithTID,
+	Assignment extends WithTileId,
+	Result extends WithTileId,
 > {
 	private poolSize: number;
 	private hired: number;
