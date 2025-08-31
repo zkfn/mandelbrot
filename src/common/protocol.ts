@@ -1,13 +1,11 @@
-import type { Tile, TileId } from "@common/tiles";
+import type { Tile, WithTileId } from "@common/tiles";
 
-export type WorkerInMessage = {
-	tileId: TileId;
-	tile: Tile;
-	maxIter?: number;
-};
-
-export type WorkerOutMessage<Payload> = {
-	tileId: TileId;
-	tile: Tile;
+export interface TileResult<Payload> extends WithTileId {
 	payload: Payload;
-};
+	tile: Tile;
+}
+
+export interface TileAssignment extends WithTileId {
+	tile: Tile;
+	maxIter: number;
+}

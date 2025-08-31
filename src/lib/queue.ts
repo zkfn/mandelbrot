@@ -1,41 +1,36 @@
 import { TileStore } from "@lib/store";
 import { ReadAndClearFlag } from "@common/flag";
-import type { Supervisor } from "@lib/supervisors/supervisor";
+import type {
+	Supervisor,
+	SupervisorsAssignment,
+	SupervisorsReceiveMessage,
+	SupervisorsResult,
+} from "@lib/supervisors/supervisor";
 import type { WithTileId } from "@common/tiles";
 
 type WorkerId = number;
 
-export class JobQueue<
-	SendMessage,
-	ReceiveMessage,
-	Assignment extends WithTileId,
-	Result extends WithTileId,
-> {
+export class JobQueue<ST extends Supervisor<any, any, WithTileId, WithTileId>> {
 	private poolSize: number;
 	private hired: number;
 	private disposed = false;
-	private jobQueue: Assignment[];
+	private jobQueue: SupervisorsAssignment<ST>[];
 
 	private readonly dirtyOnJobEnd: boolean;
 	private readonly dirtyOnJobStart: boolean;
 
-	private readonly assignments: Map<WorkerId, Assignment>;
+	private readonly assignments: Map<WorkerId, SupervisorsAssignment<ST>>;
 
 	private readonly workers: Map<WorkerId, Worker>;
 	private readonly idle: WorkerId[];
 
-	private readonly store: TileStore<Result>;
-	private readonly supervisor: Supervisor<
-		SendMessage,
-		ReceiveMessage,
-		Assignment,
-		Result
-	>;
+	private readonly store: TileStore<SupervisorsResult<ST>>;
+	private readonly supervisor: ST;
 	public readonly dirtyFlag: ReadAndClearFlag;
 
 	constructor(
-		supervisor: Supervisor<SendMessage, ReceiveMessage, Assignment, Result>,
-		store: TileStore<Result>,
+		supervisor: ST,
+		store: TileStore<SupervisorsResult<ST>>,
 		poolSize: number,
 		dirtyOnJobEnd: boolean = false,
 		dirtyOnJobStart: boolean = true,
@@ -64,12 +59,12 @@ export class JobQueue<
 		this.pump();
 	}
 
-	public enqueueEnd(...assignments: Assignment[]): void {
+	public enqueueEnd(...assignments: SupervisorsAssignment<ST>[]): void {
 		this.jobQueue.push(...assignments);
 		this.pump();
 	}
 
-	public enqueueStart(...assignments: Assignment[]): void {
+	public enqueueStart(...assignments: SupervisorsAssignment<ST>[]): void {
 		this.jobQueue.unshift(...assignments);
 		this.pump();
 	}
@@ -128,7 +123,7 @@ export class JobQueue<
 	}
 
 	private newDoneHandler = (workerId: WorkerId) => {
-		return (event: MessageEvent<ReceiveMessage>) => {
+		return (event: MessageEvent<SupervisorsReceiveMessage<ST>>) => {
 			this.handleDone(workerId, event.data);
 		};
 	};
@@ -139,14 +134,17 @@ export class JobQueue<
 		};
 	};
 
-	private handleDone = (workerId: WorkerId, message: ReceiveMessage) => {
+	private handleDone = (
+		workerId: WorkerId,
+		message: SupervisorsReceiveMessage<ST>,
+	) => {
 		if (this.disposed) return;
 
 		if (this.assignments.get(workerId)) {
 			this.assignments.delete(workerId);
 
 			this.supervisor.collectResult(message).then((value) => {
-				this.store.setReady(value.tileId, value);
+				this.store.setReady(value.tileId, value as SupervisorsResult<ST>);
 				if (this.dirtyOnJobEnd) this.dirtyFlag.set();
 			});
 		}
@@ -179,7 +177,7 @@ export class JobQueue<
 		}
 	};
 
-	private redoUnfinishedJobs(...assignments: Assignment[]) {
+	private redoUnfinishedJobs(...assignments: SupervisorsAssignment<ST>[]) {
 		this.store.resetFailedTileToQueue(assignments.map((a) => a.tileId));
 		this.enqueueStart(...assignments);
 	}

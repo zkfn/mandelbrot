@@ -3,28 +3,20 @@ import { TileState, TileStore } from "@lib/store";
 import { JobQueue } from "./queue";
 import { readAndClearMultiple } from "@common/flag";
 import { TileSetter, type ViewCornerTiles } from "./tile-setter";
-import {
-	TSSupervisor,
-	type BitmapTileResult,
-	type TSJobAssignment,
-} from "./supervisors/ts-supervisor";
+import { TSSupervisor } from "./supervisors/ts-supervisor";
 
 import type { Camera } from "./camera";
 import type { Plane } from "@common/types";
-import type { WorkerOutMessage, WorkerInMessage } from "@common/protocol";
 import type { TilePainter } from "./painter";
+import type { SupervisorsResult } from "./supervisors/supervisor";
 
 export class Composer {
 	private resolution: number = 128;
+	private maxIter: number = 500;
 
 	private readonly painter: TilePainter;
-	private readonly store: TileStore<BitmapTileResult>;
-	private readonly queue: JobQueue<
-		WorkerInMessage,
-		WorkerOutMessage<ArrayBuffer>,
-		TSJobAssignment,
-		BitmapTileResult
-	>;
+	private readonly store: TileStore<SupervisorsResult<TSSupervisor>>;
+	private readonly queue: JobQueue<TSSupervisor>;
 
 	private readonly tileSetter: TileSetter;
 	private readonly camera: Camera;
@@ -97,10 +89,8 @@ export class Composer {
 			const record = this.store.getTile(tileKeyToId(tile.key));
 
 			if (record?.state == TileState.READY) {
-				const payload = record.payload;
 				const bounds = this.camera.planeBoundsToCamera(tile.section);
-
-				this.painter.drawBitmap(payload.bitmap, bounds);
+				this.painter.drawBitmap(record.payload.payload, bounds);
 			}
 		}
 	}
@@ -121,7 +111,11 @@ export class Composer {
 
 			if (!record || record.state == TileState.QUEUED) {
 				this.store.setQueued(tid);
-				this.queue.enqueueEnd({ tile: tile, tileId: tid });
+				this.queue.enqueueEnd({
+					tile: tile,
+					tileId: tid,
+					maxIter: this.maxIter,
+				});
 			}
 		}
 	}
