@@ -4,19 +4,14 @@ import TSWorker from "@workers/mandelbrot?worker";
 
 export class TSSupervisor
 	implements
-		Supervisor<
-			TileAssignment,
-			TileResult<ArrayBuffer>,
-			TileAssignment,
-			TileResult<ImageBitmap>
-		>
+		Supervisor<TileResult<ArrayBuffer>, TileAssignment, TileResult<ImageBitmap>>
 {
 	public hireWorker(): Worker {
 		return new TSWorker();
 	}
 
-	public assignWorker(assignment: TileAssignment): TileAssignment {
-		return assignment;
+	public assignWorker(worker: Worker, assignment: TileAssignment): void {
+		worker.postMessage(assignment);
 	}
 
 	public async collectResult(

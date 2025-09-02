@@ -10,7 +10,7 @@ import type { WithTileId } from "@common/tiles";
 
 type WorkerId = number;
 
-export class JobQueue<ST extends Supervisor<any, any, WithTileId, WithTileId>> {
+export class JobQueue<ST extends Supervisor<any, WithTileId, WithTileId>> {
 	private poolSize: number;
 	private hired: number;
 	private disposed = false;
@@ -101,8 +101,8 @@ export class JobQueue<ST extends Supervisor<any, any, WithTileId, WithTileId>> {
 
 			this.assignments.set(workerId, assignment);
 			this.store.setRendering(assignment.tileId);
+			this.supervisor.assignWorker(worker, assignment);
 
-			worker.postMessage(this.supervisor.assignWorker(assignment));
 			if (this.dirtyOnJobStart) this.dirtyFlag.set();
 		}
 	}
