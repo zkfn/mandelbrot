@@ -20,13 +20,10 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 
 	useLayoutEffect(() => {
 		const canvas = assertCanvas();
-		const planeGrid = new PlaneGridHandler(plane);
-
-		planeGrid.attachToCanvas(canvas);
-		planeGridRef.current = planeGrid;
+		planeGridRef.current = new PlaneGridHandler(plane, canvas);
 
 		return () => {
-			planeGrid.deattachFromCanvas();
+			planeGridRef.current.deattachFromCanvas();
 			planeGridRef.current = null!;
 		};
 	}, [plane]);

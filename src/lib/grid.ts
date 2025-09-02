@@ -19,38 +19,30 @@ export class PlaneGridHandler {
 	private canvas: HTMLCanvasElement;
 	private resizeObserver: ResizeObserver;
 
-	public constructor(plane: Plane) {
+	public constructor(plane: Plane, canvas: HTMLCanvasElement) {
 		this.plane = plane;
 		this.camera = new Camera(plane);
-		this.tilePainter = null!;
 
-		this.canvas = null!;
-		this.resizeObserver = null!;
-		this.dprQuery = null!;
-		this.composer = null!;
-
-		this.lastPanCoord = [0, 0];
-		this.isPanning = false;
-		this.rafNumber = 0;
-	}
-
-	public attachToCanvas(canvas: HTMLCanvasElement) {
 		this.canvas = canvas;
 		this.tilePainter = new TilePainter(canvas);
 		this.composer = new Composer(this.plane, this.tilePainter, this.camera);
+
+		this.dprQuery = null!;
+		this.lastPanCoord = [0, 0];
+		this.isPanning = false;
+
+		this.resizeObserver = new ResizeObserver(this.updateCanvasDimensions);
+		this.resizeObserver.observe(this.canvas);
+
 		this.updateCanvasDimensions();
+		this.hookOntoDPR();
+		this.setDefaultPointerStyle();
 
 		canvas.addEventListener("wheel", this.handleWheel, { passive: false });
 		canvas.addEventListener("mousedown", this.handleMouseDown);
 		window.addEventListener("mousemove", this.handleMouseMove);
 		window.addEventListener("mouseup", this.handleMouseUp);
 		window.addEventListener("resize", this.updateCanvasDimensions);
-
-		this.resizeObserver = new ResizeObserver(this.updateCanvasDimensions);
-		this.resizeObserver.observe(this.canvas);
-
-		this.hookOntoDPR();
-		this.setDefaultPointerStyle();
 
 		this.rafNumber = requestAnimationFrame(this.tick);
 	}
