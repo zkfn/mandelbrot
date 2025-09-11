@@ -66,6 +66,7 @@ class TimeWheel<Key extends string | number | symbol> {
 	public clear(): void {
 		this.rememberedItems = 0;
 		this.slots.length = 0;
+		this.slots.push(new Set());
 		this.ages.clear();
 	}
 
