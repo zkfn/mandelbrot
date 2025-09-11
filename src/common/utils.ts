@@ -4,6 +4,21 @@ export function clamp(min: number, val: number, max: number): number {
 	return Math.min(max, Math.max(min, val));
 }
 
+type OptionalKeys<T> = {
+	[K in keyof T]-?: {} extends Pick<T, K> ? K : never;
+}[keyof T];
+
+type RequiredOptionals<T> = {
+	[K in OptionalKeys<T>]-?: T[K];
+};
+
+export const withDefaultProps = <Props extends object>(
+	supplied: Props,
+	defaults: RequiredOptionals<Props>,
+): Required<Props> => {
+	return { ...defaults, ...supplied } as Required<Props>;
+};
+
 export const bounds = (init: Bounds | null = null): Bounds => {
 	if (init === null) {
 		return { minX: 0, minY: 0, maxX: 0, maxY: 0 };

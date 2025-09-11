@@ -1,45 +1,72 @@
+import { withDefaultProps } from "@common/utils";
+import { DisposeFlag, InvalidatorPool } from "@common/flag";
 import { TileStore } from "@lib/store";
-import { ReadAndClearFlag } from "@common/flag";
+
+import type { Invalidable, Invalidator } from "@common/flag";
+import type { TileAssignment, WithTileId } from "@common/tiles";
 import type {
 	Supervisor,
-	SupervisorsAssignment,
 	SupervisorsReceiveMessage,
 	SupervisorsResult,
 } from "@lib/supervisors/supervisor";
-import type { WithTileId } from "@common/tiles";
 
 type WorkerId = number;
+type Generation = number;
 
-export class JobQueue<ST extends Supervisor<any, WithTileId, WithTileId>> {
-	private poolSize: number;
-	private hired: number;
-	private disposed = false;
-	private jobQueue: SupervisorsAssignment<ST>[];
+export interface JobQueueProps {
+	poolSize: number;
+	dirtyOnJobEnd: boolean;
+	dirtyOnJobStart: boolean;
+}
 
-	private readonly dirtyOnJobEnd: boolean;
+const queueDefaultProps: JobQueueProps = {
+	poolSize: 1,
+	dirtyOnJobStart: false,
+	dirtyOnJobEnd: true,
+};
+
+export class JobQueue<ST extends Supervisor<any, WithTileId>>
+	implements Invalidable
+{
+	/** Invalidation */
 	private readonly dirtyOnJobStart: boolean;
+	private readonly dirtyOnJobEnd: boolean;
+	private readonly invalidatorPool: InvalidatorPool;
 
-	private readonly assignments: Map<WorkerId, SupervisorsAssignment<ST>>;
+	/** Lifetime */
+	private disposeFlag: DisposeFlag;
+	private generation: Generation;
 
+	/** Keeping track of workers */
+	private poolSize: number;
+	private workersHired: number;
 	private readonly workers: Map<WorkerId, Worker>;
 	private readonly idle: WorkerId[];
 
-	private readonly store: TileStore<SupervisorsResult<ST>>;
-	private readonly supervisor: ST;
-	public readonly dirtyFlag: ReadAndClearFlag;
+	/** Jobs to do and assigned */
+	private readonly jobQueue: TileAssignment[];
+	private readonly assignments: Map<WorkerId, [Generation, TileAssignment]>;
 
-	constructor(
+	/** Composed classes */
+	private readonly supervisor: ST;
+	private readonly store: TileStore<SupervisorsResult<ST>>;
+
+	public constructor(
 		supervisor: ST,
 		store: TileStore<SupervisorsResult<ST>>,
-		poolSize: number,
-		dirtyOnJobEnd: boolean = false,
-		dirtyOnJobStart: boolean = true,
+		props: Partial<JobQueueProps>,
 	) {
+		const { poolSize, dirtyOnJobStart, dirtyOnJobEnd } = withDefaultProps(
+			props,
+			queueDefaultProps,
+		);
+
 		this.store = store;
 		this.supervisor = supervisor;
-		this.poolSize = poolSize;
+		this.invalidatorPool = new InvalidatorPool();
+		this.disposeFlag = new DisposeFlag("Using disposed JobQueue.");
 
-		this.dirtyFlag = new ReadAndClearFlag(false);
+		this.poolSize = poolSize;
 		this.dirtyOnJobEnd = dirtyOnJobEnd;
 		this.dirtyOnJobStart = dirtyOnJobStart;
 
@@ -48,38 +75,88 @@ export class JobQueue<ST extends Supervisor<any, WithTileId, WithTileId>> {
 
 		this.jobQueue = [];
 		this.idle = [];
-		this.hired = 0;
+		this.workersHired = 0;
+		this.generation = 0;
 
 		this.hireWorkersUntilPoolSizeIsFilled();
 	}
 
 	public setPoolSize(poolSize: number): void {
+		this.disposeFlag.assertNotDisposed();
 		this.poolSize = poolSize;
 		this.hireWorkersUntilPoolSizeIsFilled();
 		this.pump();
 	}
 
-	public enqueueEnd(...assignments: SupervisorsAssignment<ST>[]): void {
+	public getPoolSize(): number {
+		this.disposeFlag.assertNotDisposed();
+		return this.poolSize;
+	}
+
+	public addInvalidator(inv: Invalidator): void {
+		this.invalidatorPool.addInvalidator(inv);
+	}
+
+	public removeInvalidator(inv: Invalidator): void {
+		this.invalidatorPool.removeInvalidator(inv);
+	}
+
+	public getWorkerBusyness(): boolean[] {
+		this.disposeFlag.assertNotDisposed();
+
+		const busyness: boolean[] = [];
+		const perWorker: Map<WorkerId, boolean> = new Map();
+
+		for (const workerId of this.workers.keys()) {
+			perWorker.set(workerId, false);
+		}
+
+		for (const workerId of this.assignments.keys()) {
+			perWorker.set(workerId, true);
+		}
+
+		for (const busy of perWorker.values()) {
+			busyness.push(busy);
+		}
+
+		return busyness;
+	}
+
+	public getQueueSize(): number {
+		return this.jobQueue.length;
+	}
+
+	public enqueueEnd(...assignments: TileAssignment[]): void {
+		this.disposeFlag.assertNotDisposed();
 		this.jobQueue.push(...assignments);
 		this.pump();
 	}
 
-	public enqueueStart(...assignments: SupervisorsAssignment<ST>[]): void {
+	public enqueueStart(...assignments: TileAssignment[]): void {
+		this.disposeFlag.assertNotDisposed();
 		this.jobQueue.unshift(...assignments);
 		this.pump();
 	}
 
-	public prune() {
+	public prune(): void {
+		this.disposeFlag.assertNotDisposed();
 		this.jobQueue.length = 0;
 	}
 
+	public clear(): void {
+		this.disposeFlag.assertNotDisposed();
+		this.jobQueue.length = 0;
+		this.generation += 1;
+	}
+
 	public dispose(): void {
-		this.disposed = true;
+		this.disposeFlag.assertNotDisposed();
+		this.disposeFlag.set();
 		this.assignments.clear();
 		this.jobQueue.length = 0;
 
 		this.workers.forEach((worker) => {
-			this.hired -= 1;
+			this.workersHired -= 1;
 			try {
 				worker.terminate();
 			} catch {}
@@ -90,7 +167,7 @@ export class JobQueue<ST extends Supervisor<any, WithTileId, WithTileId>> {
 	}
 
 	private pump(): void {
-		if (this.disposed) return;
+		if (this.disposeFlag.read()) return;
 
 		while (this.idle.length > 0) {
 			const assignment = this.jobQueue.shift();
@@ -99,22 +176,26 @@ export class JobQueue<ST extends Supervisor<any, WithTileId, WithTileId>> {
 			const workerId = this.idle.pop()!;
 			const worker = this.workers.get(workerId)!;
 
-			this.assignments.set(workerId, assignment);
+			this.assignments.set(workerId, [this.generation, assignment]);
 			this.store.setRendering(assignment.tileId);
 			this.supervisor.assignWorker(worker, assignment);
 
-			if (this.dirtyOnJobStart) this.dirtyFlag.set();
+			if (this.dirtyOnJobStart) this.invalidatorPool.invalidate();
 		}
 	}
 
-	private hireWorkersUntilPoolSizeIsFilled() {
-		for (let workerId = this.hired; workerId < this.poolSize; workerId++) {
+	private hireWorkersUntilPoolSizeIsFilled(): void {
+		for (
+			let workerId = this.workersHired;
+			workerId < this.poolSize;
+			workerId++
+		) {
 			this.registerWorker(workerId, this.supervisor.hireWorker());
-			this.hired += 1;
+			this.workersHired += 1;
 		}
 	}
 
-	private registerWorker(workerId: WorkerId, worker: Worker) {
+	private registerWorker(workerId: WorkerId, worker: Worker): void {
 		worker.addEventListener("message", this.newDoneHandler(workerId));
 		worker.addEventListener("error", this.newErrorHandler(workerId));
 
@@ -138,14 +219,19 @@ export class JobQueue<ST extends Supervisor<any, WithTileId, WithTileId>> {
 		workerId: WorkerId,
 		message: SupervisorsReceiveMessage<ST>,
 	) => {
-		if (this.disposed) return;
+		if (this.disposeFlag.read()) return;
 
-		if (this.assignments.get(workerId)) {
+		const genAssig = this.assignments.get(workerId);
+
+		if (genAssig) {
+			const [generation, _] = genAssig;
+
 			this.assignments.delete(workerId);
-
 			this.supervisor.collectResult(message).then((value) => {
-				this.store.setReady(value.tileId, value as SupervisorsResult<ST>);
-				if (this.dirtyOnJobEnd) this.dirtyFlag.set();
+				if (generation == this.generation) {
+					this.store.setReady(value.tileId, value as SupervisorsResult<ST>);
+					if (this.dirtyOnJobEnd) this.invalidatorPool.invalidate();
+				}
 			});
 		}
 
@@ -154,12 +240,12 @@ export class JobQueue<ST extends Supervisor<any, WithTileId, WithTileId>> {
 			this.pump();
 		} else {
 			this.workers.delete(workerId);
-			this.hired -= 1;
+			this.workersHired -= 1;
 		}
 	};
 
 	private handleError = (workerId: WorkerId, error: ErrorEvent): void => {
-		const assignment = this.assignments.get(workerId);
+		const genAssig = this.assignments.get(workerId);
 
 		console.error("Worker failed", error);
 
@@ -170,14 +256,18 @@ export class JobQueue<ST extends Supervisor<any, WithTileId, WithTileId>> {
 
 			this.registerWorker(workerId, replacement);
 
-			if (assignment !== undefined) {
+			if (genAssig !== undefined) {
 				this.assignments.delete(workerId);
-				this.redoUnfinishedJobs(assignment);
+				const [generation, assignment] = genAssig;
+
+				if (generation == this.generation) {
+					this.redoUnfinishedJobs(assignment);
+				}
 			}
 		}
 	};
 
-	private redoUnfinishedJobs(...assignments: SupervisorsAssignment<ST>[]) {
+	private redoUnfinishedJobs(...assignments: TileAssignment[]): void {
 		this.store.resetFailedTileToQueue(assignments.map((a) => a.tileId));
 		this.enqueueStart(...assignments);
 	}

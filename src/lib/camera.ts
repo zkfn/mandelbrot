@@ -1,9 +1,13 @@
-import { ReadAndClearFlag } from "@common/flag";
+import {
+	InvalidatorPool,
+	type Invalidable,
+	type Invalidator,
+} from "@common/flag";
 import { boundsHeight, boundsWidth, clamp, planeToBounds } from "@common/utils";
 import { Viewport } from "@lib/viewport";
 import type { Bounds, Plane } from "@common/types";
 
-export class Camera {
+export class Camera implements Invalidable {
 	private planeSide: number;
 	private cameraBounds: Bounds;
 	private DPR: number;
@@ -13,18 +17,26 @@ export class Camera {
 
 	private readonly minUPP: number;
 	private readonly viewport: Viewport;
-	public readonly dirtyFlag: ReadAndClearFlag;
+	private readonly invalidatorPool: InvalidatorPool;
 
 	public constructor(plane: Plane) {
 		this.viewport = new Viewport(plane);
 		this.planeSide = plane.side;
 		this.cameraBounds = planeToBounds(plane);
-		this.dirtyFlag = new ReadAndClearFlag(true);
+		this.invalidatorPool = new InvalidatorPool();
 
 		this.minUPP = 2 ** -52;
 		this.maxUPP = 1;
 		this.curUPP = 1;
 		this.DPR = 1;
+	}
+
+	public addInvalidator(inv: Invalidator): void {
+		this.invalidatorPool.addInvalidator(inv);
+	}
+
+	public removeInvalidator(inv: Invalidator): void {
+		this.invalidatorPool.removeInvalidator(inv);
 	}
 
 	public getUPP() {
@@ -58,26 +70,26 @@ export class Camera {
 
 		this.ensureClampedUPP();
 		this.resizeViewport();
-		this.dirtyFlag.set();
+		this.invalidatorPool.invalidate();
 	}
 
 	public moveViewportByCameraPx(dx: number, dy: number) {
 		this.viewport.moveBy(dx * this.curUPP, dy * this.curUPP);
-		this.dirtyFlag.set();
+		this.invalidatorPool.invalidate();
 	}
 
 	public zoomViewportAtCameraPx(upp: number, x: number, y: number) {
 		const center = this.cameraCoordToPlane(x, y);
 		this.setUPP(upp);
 		this.resizeViewport(center);
-		this.dirtyFlag.set();
+		this.invalidatorPool.invalidate();
 	}
 
 	public adaptToDPR(dpr: number) {
 		this.DPR = dpr;
 	}
 
-	public optimalDepthLevelPerResolution(texelResolution: number): number {
+	public getDepthPerResolution(texelResolution: number): number {
 		return Math.ceil(
 			Math.log2(this.planeSide / (this.curUPP * texelResolution)),
 		);

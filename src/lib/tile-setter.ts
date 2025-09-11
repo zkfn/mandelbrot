@@ -1,7 +1,7 @@
 import type { TileKey, TileWithKey } from "@common/tiles";
 import type { Plane, Bounds } from "@common/types";
 
-export class ViewCornerTiles implements Bounds {
+class ViewCornerTiles implements Bounds {
 	public constructor(
 		public depth: number,
 		public minX: number,
@@ -23,52 +23,62 @@ export class ViewCornerTiles implements Bounds {
 
 export class TileSetter {
 	private planeSide: number;
+	private previousCorners: ViewCornerTiles | null;
+	private resolution: number;
 
-	public constructor(plane: Plane) {
+	public constructor(plane: Plane, resolution: number = 256) {
 		this.planeSide = plane.side;
+		this.resolution = resolution;
+		this.previousCorners = null;
 	}
 
-	public cornerTiles(viewBounds: Bounds, depth: number): ViewCornerTiles {
-		const tileWidthUnits = this.tileUnitSizeFromDepthLevel(depth);
-
-		return new ViewCornerTiles(
-			depth,
-			Math.floor(viewBounds.minX / tileWidthUnits),
-			Math.ceil(viewBounds.maxX / tileWidthUnits),
-			Math.floor(viewBounds.minY / tileWidthUnits),
-			Math.ceil(viewBounds.maxY / tileWidthUnits),
-		);
+	public setResolution(resolution: number): void {
+		if (resolution != this.resolution) {
+			this.resolution = resolution;
+			this.previousCorners = null;
+		}
 	}
 
-	public layTilesFromViewBounds(
-		view: Bounds,
-		depth: number,
-		resolution: number,
-	): TileWithKey[] {
-		return this.layTilesFromCorners(this.cornerTiles(view, depth), resolution);
+	public getResolution(): number {
+		return this.resolution;
 	}
 
-	public layTilesFromCorners(
-		cornerTiles: ViewCornerTiles,
-		resolution: number,
-	): TileWithKey[] {
+	public didViewChange(bounds: Bounds, depth: number): boolean {
+		const corners = this.cornerTiles(bounds, depth);
+
+		if (!this.previousCorners || !this.previousCorners.isSameAs(corners)) {
+			this.previousCorners = corners;
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	public layTiles(view: Bounds, depth: number): TileWithKey[] {
+		const corners = this.cornerTiles(view, depth);
+
 		const tiles: TileWithKey[] = [];
-		const tileWidthUnits = this.tileUnitSizeFromDepthLevel(cornerTiles.depth);
+		const tileWidthUnits = this.tileUnitSizeFromDepthLevel(corners.depth);
 
 		let minX;
 		let maxX;
 
-		let minY = cornerTiles.minY * tileWidthUnits;
+		let minY = corners.minY * tileWidthUnits;
 		let maxY = minY + tileWidthUnits;
 
-		for (let iy = cornerTiles.minY; iy < cornerTiles.maxY; iy++) {
-			minX = cornerTiles.minX * tileWidthUnits;
+		for (let iy = corners.minY; iy < corners.maxY; iy++) {
+			minX = corners.minX * tileWidthUnits;
 			maxX = minX + tileWidthUnits;
 
-			for (let ix = cornerTiles.minX; ix < cornerTiles.maxX; ix++) {
-				const key: TileKey = { depth: cornerTiles.depth, ix, iy };
+			for (let ix = corners.minX; ix < corners.maxX; ix++) {
+				const key: TileKey = { depth: corners.depth, ix, iy };
 				const section = { minX, maxX, minY, maxY };
-				const rect = { width: resolution, height: resolution, top: 0, left: 0 };
+				const rect = {
+					width: this.resolution,
+					height: this.resolution,
+					top: 0,
+					left: 0,
+				};
 
 				const tile: TileWithKey = {
 					section,
@@ -86,6 +96,18 @@ export class TileSetter {
 		}
 
 		return tiles;
+	}
+
+	private cornerTiles(viewBounds: Bounds, depth: number): ViewCornerTiles {
+		const tileWidthUnits = this.tileUnitSizeFromDepthLevel(depth);
+
+		return new ViewCornerTiles(
+			depth,
+			Math.floor(viewBounds.minX / tileWidthUnits),
+			Math.ceil(viewBounds.maxX / tileWidthUnits),
+			Math.floor(viewBounds.minY / tileWidthUnits),
+			Math.ceil(viewBounds.maxY / tileWidthUnits),
+		);
 	}
 
 	private tileUnitSizeFromDepthLevel(depthLevel: number): number {

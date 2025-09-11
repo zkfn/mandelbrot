@@ -1,4 +1,6 @@
-import { type TileId, type WithTileId } from "@common/tiles";
+import { DisposeFlag } from "@common/flag";
+import { withDefaultProps } from "@common/utils";
+import type { TileId, WithTileId } from "@common/tiles";
 
 export enum TileState {
 	QUEUED,
@@ -26,6 +28,7 @@ class TimeWheel<Key extends string | number | symbol> {
 
 	/** Value 0 (or less) means there is no max age */
 	public maxAge: number;
+
 	public minAge: number;
 	public maxItems: number;
 
@@ -60,7 +63,8 @@ class TimeWheel<Key extends string | number | symbol> {
 		this.slots.unshift(new Set());
 	}
 
-	public dispose(): void {
+	public clear(): void {
+		this.rememberedItems = 0;
 		this.slots.length = 0;
 		this.ages.clear();
 	}
@@ -106,34 +110,67 @@ class TimeWheel<Key extends string | number | symbol> {
 	}
 }
 
-export class TileStore<Payload extends WithTileId> {
-	private tiles: Map<TileId, TileRecord<Payload>>;
-	private timeWheel: TimeWheel<TileId>;
+export interface TileStoreProps {
+	minAge: number;
+	maxAge: number;
+	capacity: number;
+}
 
-	public constructor(storeSize: number, minAge: number, maxAge: number = 0) {
+const storeDefaultProps: TileStoreProps = {
+	minAge: 5,
+	maxAge: 0,
+	capacity: 5000,
+};
+
+export class TileStore<Payload extends WithTileId> {
+	private readonly tiles: Map<TileId, TileRecord<Payload>>;
+	private readonly timeWheel: TimeWheel<TileId>;
+	private readonly disposeFlag: DisposeFlag;
+
+	public constructor(props: Partial<TileStoreProps>) {
+		const { minAge, maxAge, capacity } = withDefaultProps(
+			props,
+			storeDefaultProps,
+		);
+
 		this.tiles = new Map();
-		this.timeWheel = new TimeWheel(storeSize, minAge, maxAge);
+		this.timeWheel = new TimeWheel(capacity, minAge, maxAge);
+		this.disposeFlag = new DisposeFlag();
 	}
 
 	public setMaxAge(maxAge: number): void {
+		this.disposeFlag.assertNotDisposed();
 		this.timeWheel.maxAge = maxAge;
 		this.prune();
 	}
 
 	public setMaxSize(maxSize: number): void {
+		this.disposeFlag.assertNotDisposed();
 		this.timeWheel.maxItems = maxSize;
 		this.prune();
 	}
 
-	public prune() {
+	public prune(): void {
+		this.disposeFlag.assertNotDisposed();
+
 		for (const tileId of this.timeWheel.prune()) {
 			this.tiles.delete(tileId);
 		}
 	}
 
-	public dispose() {
+	public clear(): void {
+		this.disposeFlag.assertNotDisposed();
+
 		this.tiles.clear();
-		this.timeWheel.dispose();
+		this.timeWheel.clear();
+	}
+
+	public dispose(): void {
+		this.disposeFlag.assertNotDisposed();
+		this.disposeFlag.set();
+
+		this.tiles.clear();
+		this.timeWheel.clear();
 	}
 
 	public size(): number {
@@ -141,10 +178,13 @@ export class TileStore<Payload extends WithTileId> {
 	}
 
 	public getTile(tileId: TileId): TileRecord<Payload> | undefined {
+		this.disposeFlag.assertNotDisposed();
 		return this.tiles.get(tileId);
 	}
 
-	public setQueued(tileId: TileId) {
+	public setQueued(tileId: TileId): void {
+		this.disposeFlag.assertNotDisposed();
+
 		const record = this.tiles.get(tileId);
 
 		if (!record) {
@@ -154,7 +194,9 @@ export class TileStore<Payload extends WithTileId> {
 		}
 	}
 
-	public setRendering(tileId: TileId) {
+	public setRendering(tileId: TileId): void {
+		this.disposeFlag.assertNotDisposed();
+
 		const tile = this.tiles.get(tileId);
 
 		if (!tile) {
@@ -166,7 +208,9 @@ export class TileStore<Payload extends WithTileId> {
 		}
 	}
 
-	public setReady(tileId: TileId, payload: Payload) {
+	public setReady(tileId: TileId, payload: Payload): void {
+		this.disposeFlag.assertNotDisposed();
+
 		const tile = this.tiles.get(tileId);
 
 		if (!tile) {
@@ -182,7 +226,9 @@ export class TileStore<Payload extends WithTileId> {
 		}
 	}
 
-	public resetFailedTileToQueue(tileIds: TileId[]) {
+	public resetFailedTileToQueue(tileIds: TileId[]): void {
+		this.disposeFlag.assertNotDisposed();
+
 		tileIds.forEach((tileId) => {
 			const tile = this.tiles.get(tileId);
 

@@ -1,6 +1,7 @@
-import { useLayoutEffect, useRef, type FC } from "react";
+import { useLayoutEffect, useMemo, useRef, type FC } from "react";
 import { PlaneGridHandler } from "@lib/grid";
 import type { Plane } from "@common/types";
+import ControlPanel from "./ControlPanel";
 
 interface GridViewerProps {
 	plane: Plane;
@@ -8,7 +9,10 @@ interface GridViewerProps {
 
 const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null!);
-	const planeGridRef = useRef<PlaneGridHandler>(null!);
+	const planeGrid = useMemo<PlaneGridHandler>(
+		() => new PlaneGridHandler(plane),
+		[plane],
+	);
 
 	const assertCanvas = (): HTMLCanvasElement => {
 		if (!canvasRef.current) {
@@ -20,23 +24,29 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 
 	useLayoutEffect(() => {
 		const canvas = assertCanvas();
-		planeGridRef.current = new PlaneGridHandler(plane, canvas);
+		planeGrid.attachToCanvas(canvas);
 
 		return () => {
-			planeGridRef.current.deattachFromCanvas();
-			planeGridRef.current = null!;
+			planeGrid.deattachFromCanvas();
 		};
 	}, [plane]);
 
 	return (
-		<canvas
-			ref={canvasRef}
-			style={{
-				width: "100%",
-				height: "100%",
-				display: "block",
-			}}
-		/>
+		<>
+			<canvas
+				ref={canvasRef}
+				style={{
+					width: "100%",
+					height: "100%",
+					display: "block",
+				}}
+			/>
+			<ControlPanel
+				poolSize={planeGrid.getPoolSize()}
+				onPoolSizeSet={(size) => planeGrid.setPoolSize(size)}
+				onRequestWorkerBusyness={() => planeGrid.getWorkerBusyness()}
+			/>
+		</>
 	);
 };
 

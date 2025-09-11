@@ -1,107 +1,98 @@
-import { tileKeyToId, type TileWithKey } from "@common/tiles";
+import { tileKeyToId, type TileWithKey, type WithTileId } from "@common/tiles";
 import { TileState, TileStore } from "@lib/store";
 import { JobQueue } from "./queue";
-import { readAndClearMultiple } from "@common/flag";
-import { TileSetter, type ViewCornerTiles } from "./tile-setter";
-import { TSSupervisor } from "./supervisors/ts-supervisor";
+import { DisposeFlag, ReadAndClearFlag } from "@common/flag";
+import { TileSetter } from "./tile-setter";
 
 import type { Camera } from "./camera";
 import type { Plane } from "@common/types";
-import type { TilePainter } from "./painter";
-import type { SupervisorsResult } from "./supervisors/supervisor";
+import type { Supervisor, SupervisorsResult } from "./supervisors/supervisor";
+import type { Painter } from "@lib/painters/painter";
 
-export class Composer {
-	private resolution: number = 128;
+export class Composer<ST extends Supervisor<any, WithTileId>> {
 	private maxIter: number = 500;
 
-	private readonly painter: TilePainter;
-	private readonly store: TileStore<SupervisorsResult<TSSupervisor>>;
-	private readonly queue: JobQueue<TSSupervisor>;
+	private readonly disposeFlag: DisposeFlag;
+	private readonly painter: Painter<SupervisorsResult<ST>>;
+	private readonly store: TileStore<SupervisorsResult<ST>>;
+	private readonly queue: JobQueue<ST>;
 
 	private readonly tileSetter: TileSetter;
 	private readonly camera: Camera;
-	private previousCorners: ViewCornerTiles | null;
+	private readonly dirtyFlag: ReadAndClearFlag;
 
-	public constructor(plane: Plane, painter: TilePainter, camera: Camera) {
-		this.store = new TileStore(15000, 10, 100);
-		this.tileSetter = new TileSetter(plane);
-		this.previousCorners = null;
-
-		this.queue = new JobQueue(new TSSupervisor(), this.store, 4);
+	public constructor(
+		plane: Plane,
+		store: TileStore<SupervisorsResult<ST>>,
+		queue: JobQueue<ST>,
+		painter: Painter<SupervisorsResult<ST>>,
+		camera: Camera,
+		resolution: number,
+	) {
+		this.store = store;
+		this.queue = queue;
 		this.camera = camera;
 		this.painter = painter;
+		this.tileSetter = new TileSetter(plane, resolution);
+		this.disposeFlag = new DisposeFlag();
+
+		this.dirtyFlag = new ReadAndClearFlag(true);
+		this.queue.addInvalidator(this.dirtyFlag.set);
+		this.camera.addInvalidator(this.dirtyFlag.set);
+	}
+
+	public dispose(): void {
+		this.disposeFlag.set();
+		this.queue.removeInvalidator(this.dirtyFlag.set);
+		this.camera.removeInvalidator(this.dirtyFlag.set);
 	}
 
 	public draw() {
-		if (!readAndClearMultiple(this.queue.dirtyFlag, this.camera.dirtyFlag)) {
+		this.disposeFlag.assertNotDisposed();
+
+		if (!this.dirtyFlag.readAndClear()) {
 			return;
 		}
 
-		this.painter.clearCanvas();
-
-		const depth = this.camera.optimalDepthLevelPerResolution(this.resolution);
 		const bounds = this.camera.viewportBounds();
-		const corners = this.tileSetter.cornerTiles(bounds, depth);
+		const resolution = this.tileSetter.getResolution();
+		const depth = this.camera.getDepthPerResolution(resolution);
 		const tiles = this.determineVisibleTiles(depth);
 
-		if (!this.checkSameCorners(corners)) {
+		if (this.tileSetter.didViewChange(bounds, depth)) {
 			this.queue.prune();
 			this.prepareTiles(tiles);
 			this.store.prune();
 		}
 
-		this.paintTiles(tiles);
+		this.painter.clearCanvas();
+		this.painter.paintTiles(
+			tiles
+				.map((tile) => this.store.getTile(tileKeyToId(tile.key)))
+				.filter((tile) => tile !== undefined),
+		);
 	}
 
-	public dispose() {
-		this.queue.dispose();
-		this.store.dispose();
-		this.previousCorners = null;
+	public getResolution(): number {
+		return this.tileSetter.getResolution();
+	}
+
+	public setResolution(resolution: number): void {
+		if (resolution != this.tileSetter.getResolution()) {
+			this.tileSetter.setResolution(resolution);
+			this.queue.clear();
+			this.store.clear();
+			this.dirtyFlag.set();
+		}
 	}
 
 	private determineVisibleTiles(depth: number): TileWithKey[] {
 		return [
-			...this.tileSetter.layTilesFromViewBounds(
-				this.camera.viewportBounds(),
-				depth - 3,
-				this.resolution,
-			),
-			...this.tileSetter.layTilesFromViewBounds(
-				this.camera.viewportBounds(),
-				depth - 2,
-				this.resolution,
-			),
-			...this.tileSetter.layTilesFromViewBounds(
-				this.camera.viewportBounds(),
-				depth - 1,
-				this.resolution,
-			),
-			...this.tileSetter.layTilesFromViewBounds(
-				this.camera.viewportBounds(),
-				depth,
-				this.resolution,
-			),
+			...this.tileSetter.layTiles(this.camera.viewportBounds(), depth - 3),
+			...this.tileSetter.layTiles(this.camera.viewportBounds(), depth - 2),
+			...this.tileSetter.layTiles(this.camera.viewportBounds(), depth - 1),
+			...this.tileSetter.layTiles(this.camera.viewportBounds(), depth),
 		];
-	}
-
-	private paintTiles(tiles: TileWithKey[]) {
-		for (const tile of tiles) {
-			const record = this.store.getTile(tileKeyToId(tile.key));
-
-			if (record?.state == TileState.READY) {
-				const bounds = this.camera.planeBoundsToCamera(tile.section);
-				this.painter.drawBitmap(record.payload.payload, bounds);
-			}
-		}
-	}
-
-	private checkSameCorners(corners: ViewCornerTiles): boolean {
-		if (!this.previousCorners || !this.previousCorners.isSameAs(corners)) {
-			this.previousCorners = corners;
-			return false;
-		} else {
-			return true;
-		}
 	}
 
 	private prepareTiles(tiles: TileWithKey[]) {

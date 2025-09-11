@@ -24,3 +24,8 @@ export interface TileWithKey extends Tile {
 export interface WithTileId {
 	tileId: TileId;
 }
+
+export interface TileAssignment extends WithTileId {
+	maxIter: number;
+	tile: Tile;
+}

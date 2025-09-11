@@ -1,16 +1,23 @@
 import { Camera } from "@lib/camera";
-import type { Plane } from "@common/types";
-import { TilePainter } from "./painter";
 import { Composer } from "./composer";
+import { TSSupervisor } from "./supervisors/ts-supervisor";
+import { JobQueue } from "./queue";
+import { TileStore } from "./store";
+import { BitmapPainter, type BitmapResult } from "./painters/bitmap-painter";
+import type { Plane } from "@common/types";
 
 export class PlaneGridHandler {
-	private zoomFactor = 0.001;
-	private plane: Plane;
-	private composer: Composer;
-	private rafNumber: number;
+	private readonly zoomFactor = 0.001;
+	private readonly plane: Plane;
 
+	private poolSize: number;
+	private resolution: number;
+
+	private composer: Composer<TSSupervisor> | null;
+	private jobQueue: JobQueue<TSSupervisor> | null;
+	private tilePainter: BitmapPainter;
+	private store: TileStore<BitmapResult>;
 	private camera: Camera;
-	private tilePainter: TilePainter;
 
 	private lastPanCoord: [number, number];
 	private isPanning: boolean;
@@ -18,25 +25,55 @@ export class PlaneGridHandler {
 	private dprQuery: MediaQueryList;
 	private canvas: HTMLCanvasElement;
 	private resizeObserver: ResizeObserver;
+	private rafNumber: number;
 
-	public constructor(plane: Plane, canvas: HTMLCanvasElement) {
+	public constructor(plane: Plane) {
 		this.plane = plane;
-		this.camera = new Camera(plane);
 
-		this.canvas = canvas;
-		this.tilePainter = new TilePainter(canvas);
-		this.composer = new Composer(this.plane, this.tilePainter, this.camera);
+		this.camera = null!;
+		this.tilePainter = null!;
+		this.store = null!;
+		this.jobQueue = null!;
+
+		// TODO this should have meaningful defaults
+		// and should be configurable via props.
+		this.poolSize = 7;
+		this.resolution = 128;
+
+		this.composer = null;
 
 		this.dprQuery = null!;
+		this.canvas = null!;
+		this.rafNumber = 0;
+
 		this.lastPanCoord = [0, 0];
 		this.isPanning = false;
 
 		this.resizeObserver = new ResizeObserver(this.updateCanvasDimensions);
-		this.resizeObserver.observe(this.canvas);
+	}
 
-		this.updateCanvasDimensions();
-		this.hookOntoDPR();
-		this.setDefaultPointerStyle();
+	public attachToCanvas(canvas: HTMLCanvasElement) {
+		this.canvas = canvas;
+
+		this.tilePainter = new BitmapPainter();
+		this.camera = new Camera(this.plane);
+		this.store = new TileStore({});
+		this.jobQueue = new JobQueue(new TSSupervisor(), this.store, {
+			poolSize: this.poolSize,
+		});
+		this.composer = new Composer(
+			this.plane,
+			this.store,
+			this.jobQueue,
+			this.tilePainter,
+			this.camera,
+			this.resolution,
+		);
+
+		this.tilePainter.setCanvas(this.canvas);
+		this.tilePainter.setCamera(this.camera);
+
+		this.resizeObserver.observe(canvas);
 
 		canvas.addEventListener("wheel", this.handleWheel, { passive: false });
 		canvas.addEventListener("mousedown", this.handleMouseDown);
@@ -45,6 +82,10 @@ export class PlaneGridHandler {
 		window.addEventListener("resize", this.updateCanvasDimensions);
 
 		this.rafNumber = requestAnimationFrame(this.tick);
+
+		this.updateCanvasDimensions();
+		this.hookOntoDPR();
+		this.setDefaultPointerStyle();
 	}
 
 	public deattachFromCanvas() {
@@ -62,12 +103,48 @@ export class PlaneGridHandler {
 		this.unhookFromDPR();
 
 		this.canvas = null!;
-		this.composer.dispose();
 		this.rafNumber = 0;
+
+		this.composer?.dispose();
+		this.jobQueue?.dispose();
+		this.store?.dispose();
+	}
+
+	public getPoolSize(): number {
+		console.log(this.poolSize);
+		return this.poolSize;
+	}
+
+	public setPoolSize(poolSize: number): void {
+		this.poolSize = poolSize;
+
+		if (this.jobQueue !== null) {
+			this.jobQueue.setPoolSize(poolSize);
+		}
+	}
+
+	public getWorkerBusyness(): boolean[] | null {
+		if (this.jobQueue !== null) {
+			return this.jobQueue.getWorkerBusyness();
+		} else {
+			return null;
+		}
+	}
+
+	public getResolution(): number {
+		return this.resolution;
+	}
+
+	public setResolution(resolution: number) {
+		this.resolution = resolution;
+
+		if (this.composer) {
+			this.composer.setResolution(resolution);
+		}
 	}
 
 	private tick = () => {
-		this.composer.draw();
+		this.composer?.draw();
 		this.rafNumber = requestAnimationFrame(this.tick);
 	};
 
@@ -135,6 +212,7 @@ export class PlaneGridHandler {
 
 	private handleWheel = (event: WheelEvent) => {
 		event.preventDefault();
+		console.log("Wheel");
 
 		const factor = 2 ** (this.zoomFactor * event.deltaY);
 		const [cameraX, cameraY] = this.camera.clientCoordToCamera(
