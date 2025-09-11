@@ -84,6 +84,7 @@ export class JobQueue<ST extends Supervisor<any, WithTileId>>
 	public setPoolSize(poolSize: number): void {
 		this.disposeFlag.assertNotDisposed();
 		this.poolSize = poolSize;
+		this.fireIdleWorkersUntilPoolSizeIsMatched();
 		this.hireWorkersUntilPoolSizeIsFilled();
 		this.pump();
 	}
@@ -195,6 +196,34 @@ export class JobQueue<ST extends Supervisor<any, WithTileId>>
 		}
 	}
 
+	private fireIdleWorkersUntilPoolSizeIsMatched(): void {
+		for (
+			let workerId = this.poolSize;
+			workerId < this.workersHired;
+			workerId++
+		) {
+			if (this.idle.includes(workerId)) {
+				this.fireWorker(workerId);
+			}
+		}
+	}
+
+	private fireWorker(workerId: WorkerId): void {
+		const worker = this.workers.get(workerId);
+		if (worker) {
+			const i = this.idle.indexOf(workerId);
+			if (i !== -1) this.idle.splice(i, 1);
+
+			this.workers.delete(workerId);
+			this.workersHired -= 1;
+			try {
+				worker.terminate();
+			} catch {}
+		} else {
+			throw new Error("Trying to fire nonexistent worker");
+		}
+	}
+
 	private registerWorker(workerId: WorkerId, worker: Worker): void {
 		worker.addEventListener("message", this.newDoneHandler(workerId));
 		worker.addEventListener("error", this.newErrorHandler(workerId));
@@ -235,12 +264,11 @@ export class JobQueue<ST extends Supervisor<any, WithTileId>>
 			});
 		}
 
-		if (workerId <= this.poolSize) {
+		if (workerId < this.poolSize) {
 			this.idle.push(workerId);
 			this.pump();
 		} else {
-			this.workers.delete(workerId);
-			this.workersHired -= 1;
+			this.fireWorker(workerId);
 		}
 	};
 

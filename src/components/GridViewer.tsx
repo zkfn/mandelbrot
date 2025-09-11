@@ -14,6 +14,8 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 		[plane],
 	);
 
+	const [poolSize, setPoolSize] = planeGrid.usePoolSize();
+
 	const assertCanvas = (): HTMLCanvasElement => {
 		if (!canvasRef.current) {
 			throw Error("Canvas ref is empty.");
@@ -32,7 +34,14 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 	}, [plane]);
 
 	return (
-		<>
+		<div
+			style={{
+				display: "grid",
+				gridTemplateColumns: "auto 200px",
+				width: "100%",
+				height: "100%",
+			}}
+		>
 			<canvas
 				ref={canvasRef}
 				style={{
@@ -42,11 +51,11 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 				}}
 			/>
 			<ControlPanel
-				poolSize={planeGrid.getPoolSize()}
-				onPoolSizeSet={(size) => planeGrid.setPoolSize(size)}
+				poolSize={poolSize}
+				onPoolSizeSet={setPoolSize}
 				onRequestWorkerBusyness={() => planeGrid.getWorkerBusyness()}
 			/>
-		</>
+		</div>
 	);
 };
 
