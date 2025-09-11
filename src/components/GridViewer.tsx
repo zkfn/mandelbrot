@@ -1,7 +1,8 @@
 import { useLayoutEffect, useMemo, useRef, type FC } from "react";
 import { PlaneGridHandler } from "@lib/grid";
-import type { Plane } from "@common/types";
+import { Provider } from "jotai";
 import ControlPanel from "./ControlPanel";
+import type { Plane } from "@common/types";
 
 interface GridViewerProps {
 	plane: Plane;
@@ -13,8 +14,6 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 		() => new PlaneGridHandler(plane),
 		[plane],
 	);
-
-	const [poolSize, setPoolSize] = planeGrid.usePoolSize();
 
 	const assertCanvas = (): HTMLCanvasElement => {
 		if (!canvasRef.current) {
@@ -50,11 +49,9 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 					display: "block",
 				}}
 			/>
-			<ControlPanel
-				poolSize={poolSize}
-				onPoolSizeSet={setPoolSize}
-				onRequestWorkerBusyness={() => planeGrid.getWorkerBusyness()}
-			/>
+			<Provider store={planeGrid.store}>
+				<ControlPanel planeGrid={planeGrid} />
+			</Provider>
 		</div>
 	);
 };

@@ -1,12 +1,14 @@
+import { useAtom } from "jotai";
+import type { PlaneGridHandler } from "@lib/grid";
 import type { FC } from "react";
 
 interface ControlPanelProps {
-	onRequestWorkerBusyness: () => boolean[] | null;
-	onPoolSizeSet: (poolSize: number) => void;
-	poolSize: number;
+	planeGrid: PlaneGridHandler;
 }
 
-const ControlPanel: FC<ControlPanelProps> = ({ onPoolSizeSet, poolSize }) => {
+const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
+	const [poolSize, setPoolSize] = useAtom(planeGrid.poolSize);
+
 	return (
 		<div>
 			<input
@@ -15,7 +17,7 @@ const ControlPanel: FC<ControlPanelProps> = ({ onPoolSizeSet, poolSize }) => {
 				max={7}
 				step={1}
 				value={poolSize}
-				onChange={(e) => onPoolSizeSet(e.currentTarget.valueAsNumber)}
+				onChange={(e) => setPoolSize(e.currentTarget.valueAsNumber)}
 				style={{ width: 180, display: "block" }}
 			/>
 		</div>

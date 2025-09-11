@@ -4,18 +4,23 @@ import { TSSupervisor } from "./supervisors/ts-supervisor";
 import { JobQueue } from "./queue";
 import { TileStore } from "./store";
 import { BitmapPainter, type BitmapResult } from "./painters/bitmap-painter";
-import type { Plane } from "@common/types";
-import { atom, createStore, useAtom } from "jotai";
+import { createStore } from "jotai";
+import { atomWithStorage } from "jotai/utils";
 import type { PrimitiveAtom } from "jotai";
 import type { Store } from "jotai/vanilla/store";
+import type { Plane } from "@common/types";
+import { bindAtom } from "@common/utils";
 
 export class PlaneGridHandler {
 	private readonly zoomFactor = 0.001;
 	private readonly plane: Plane;
 
-	private poolSize: PrimitiveAtom<number>;
-	private resolution: PrimitiveAtom<number>;
-	readonly store: Store;
+	public readonly poolSize: PrimitiveAtom<number>;
+	public readonly resolution: PrimitiveAtom<number>;
+	public readonly store: Store;
+
+	private poolSizeUnsub: () => void;
+	private resolutionUnsub: () => void;
 
 	private composer: Composer<TSSupervisor> | null;
 	private jobQueue: JobQueue<TSSupervisor> | null;
@@ -39,10 +44,13 @@ export class PlaneGridHandler {
 		this.tileStore = null!;
 		this.jobQueue = null!;
 
+		this.poolSizeUnsub = null!;
+		this.resolutionUnsub = null!;
+
 		// TODO this should have meaningful defaults
 		// and should be configurable via props.
-		this.poolSize = atom(7);
-		this.resolution = atom(128);
+		this.poolSize = atomWithStorage("poolSize", 7);
+		this.resolution = atomWithStorage("resolution", 128);
 		this.store = createStore();
 
 		this.composer = null;
@@ -80,6 +88,17 @@ export class PlaneGridHandler {
 		this.tilePainter.setCanvas(this.canvas);
 		this.tilePainter.setCamera(this.camera);
 
+		this.poolSizeUnsub = bindAtom(
+			this.store,
+			this.poolSize,
+			this.updatePoolSize,
+		);
+		this.resolutionUnsub = bindAtom(
+			this.store,
+			this.resolution,
+			this.updateResolution,
+		);
+
 		this.resizeObserver.observe(canvas);
 
 		canvas.addEventListener("wheel", this.handleWheel, { passive: false });
@@ -112,35 +131,24 @@ export class PlaneGridHandler {
 		this.canvas = null!;
 		this.rafNumber = 0;
 
+		this.poolSizeUnsub();
+		this.resolutionUnsub();
+
 		this.composer?.dispose();
 		this.jobQueue?.dispose();
 		this.tileStore?.dispose();
 	}
 
-	public usePoolSize = (): [number, (poolSize: number) => void] => {
-		const [poolSize, setPoolSize] = useAtom(this.poolSize);
-		return [
-			poolSize,
-			(newPoolSize: number) => {
-				setPoolSize(newPoolSize);
-				if (this.jobQueue !== null) {
-					this.jobQueue.setPoolSize(newPoolSize);
-				}
-			},
-		];
+	public updatePoolSize = (poolSize: number): void => {
+		if (this.jobQueue !== null) {
+			this.jobQueue.setPoolSize(poolSize);
+		}
 	};
 
-	public useResolution = (): [number, (resolution: number) => void] => {
-		const [resolution, setResolution] = useAtom(this.resolution);
-		return [
-			resolution,
-			(newResolution: number) => {
-				setResolution(newResolution);
-				if (this.composer !== null) {
-					this.composer.setResolution(newResolution);
-				}
-			},
-		];
+	private updateResolution = (resolution: number): void => {
+		if (this.composer !== null) {
+			this.composer.setResolution(resolution);
+		}
 	};
 
 	public getWorkerBusyness(): boolean[] | null {
