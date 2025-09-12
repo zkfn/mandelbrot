@@ -15,6 +15,10 @@ export function clamp(min: number, val: number, max: number): number {
 	return Math.min(max, Math.max(min, val));
 }
 
+export function range(min: number, exclusive: number): number[] {
+	return [...Array(exclusive - min).keys()].map((k) => k + min);
+}
+
 type OptionalKeys<T> = {
 	[K in keyof T]-?: {} extends Pick<T, K> ? K : never;
 }[keyof T];

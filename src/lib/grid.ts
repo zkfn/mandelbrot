@@ -10,6 +10,7 @@ import type { PrimitiveAtom } from "jotai";
 import type { Store } from "jotai/vanilla/store";
 import type { Plane } from "@common/types";
 import { bindAtom } from "@common/utils";
+import { resolutionValues } from "./resolution";
 
 export class PlaneGridHandler {
 	private readonly zoomFactor = 0.001;
@@ -50,7 +51,7 @@ export class PlaneGridHandler {
 		// TODO this should have meaningful defaults
 		// and should be configurable via props.
 		this.poolSize = atomWithStorage("poolSize", 7);
-		this.resolution = atomWithStorage("resolution", 128);
+		this.resolution = atomWithStorage("resolution", resolutionValues[0]);
 		this.store = createStore();
 
 		this.composer = null;
