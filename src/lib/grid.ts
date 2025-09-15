@@ -16,12 +16,14 @@ export class PlaneGridHandler {
 	private readonly zoomFactor = 0.001;
 	private readonly plane: Plane;
 
+	public readonly maxIterations: PrimitiveAtom<number>;
 	public readonly poolSize: PrimitiveAtom<number>;
 	public readonly resolution: PrimitiveAtom<number>;
 	public readonly store: Store;
 
 	private poolSizeUnsub: () => void;
 	private resolutionUnsub: () => void;
+	private maxIterationsUnsub: () => void;
 
 	private composer: Composer<TSSupervisor> | null;
 	private jobQueue: JobQueue<TSSupervisor> | null;
@@ -47,11 +49,13 @@ export class PlaneGridHandler {
 
 		this.poolSizeUnsub = null!;
 		this.resolutionUnsub = null!;
+		this.maxIterationsUnsub = null!;
 
 		// TODO this should have meaningful defaults
 		// and should be configurable via props.
 		this.poolSize = atomWithStorage("poolSize", 7);
 		this.resolution = atomWithStorage("resolution", resolutionValues[0]);
+		this.maxIterations = atomWithStorage("maxIterations", 500);
 		this.store = createStore();
 
 		this.composer = null;
@@ -94,10 +98,17 @@ export class PlaneGridHandler {
 			this.poolSize,
 			this.updatePoolSize,
 		);
+
 		this.resolutionUnsub = bindAtom(
 			this.store,
 			this.resolution,
 			this.updateResolution,
+		);
+
+		this.maxIterationsUnsub = bindAtom(
+			this.store,
+			this.maxIterations,
+			this.updateMaxIterations,
 		);
 
 		this.resizeObserver.observe(canvas);
@@ -134,6 +145,7 @@ export class PlaneGridHandler {
 
 		this.poolSizeUnsub();
 		this.resolutionUnsub();
+		this.maxIterationsUnsub();
 
 		this.composer?.dispose();
 		this.jobQueue?.dispose();
@@ -149,6 +161,12 @@ export class PlaneGridHandler {
 	private updateResolution = (resolution: number): void => {
 		if (this.composer !== null) {
 			this.composer.setResolution(resolution);
+		}
+	};
+
+	private updateMaxIterations = (iterations: number): void => {
+		if (this.composer !== null) {
+			this.composer.setMaxIterations(iterations);
 		}
 	};
 

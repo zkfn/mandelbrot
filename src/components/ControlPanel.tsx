@@ -12,11 +12,16 @@ interface ControlPanelProps {
 const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 	const [poolSize, setPoolSize] = useAtom(planeGrid.poolSize);
 	const [resolution, setResolution] = useAtom(planeGrid.resolution);
+	const [iters, setIters] = useAtom(planeGrid.maxIterations);
 	const [busyness, setBusyness] = useState(planeGrid.getWorkerBusyness());
 
-	useInterval(() => setBusyness(planeGrid.getWorkerBusyness()), 100, [
-		planeGrid,
-	]);
+	useInterval(
+		() => {
+			setBusyness(planeGrid.getWorkerBusyness());
+		},
+		100,
+		[planeGrid],
+	);
 
 	return (
 		<div
@@ -35,7 +40,7 @@ const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 					onChange={(e) => setPoolSize(e.currentTarget.valueAsNumber)}
 					style={{ width: 180, display: "block" }}
 				/>
-				{poolSize}
+				<p>{poolSize}</p>
 			</div>
 			<div style={{ display: "flex", flexDirection: "row" }}>
 				<input
@@ -49,7 +54,21 @@ const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 					}}
 					style={{ width: 180, display: "block" }}
 				/>
-				{resolution}
+				<p>{resolution}</p>
+			</div>
+			<div style={{ display: "flex", flexDirection: "row" }}>
+				<input
+					type="range"
+					min={50}
+					max={4000}
+					step={50}
+					value={iters}
+					onChange={(e) => {
+						setIters(e.currentTarget.valueAsNumber);
+					}}
+					style={{ width: 180, display: "block" }}
+				/>
+				<p>{iters}</p>
 			</div>
 			{busyness && <BusynessDisplay busyness={busyness} />}
 		</div>

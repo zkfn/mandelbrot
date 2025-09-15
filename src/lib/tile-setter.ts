@@ -54,6 +54,10 @@ export class TileSetter {
 		}
 	}
 
+	public clearRememberedView(): void {
+		this.previousCorners = null;
+	}
+
 	public layTiles(view: Bounds, depth: number): TileWithKey[] {
 		const corners = this.cornerTiles(view, depth);
 

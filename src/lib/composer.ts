@@ -1,17 +1,20 @@
-import { tileKeyToId, type TileWithKey, type WithTileId } from "@common/tiles";
+import { tileKeyToId } from "@common/tiles";
 import { TileState, TileStore } from "@lib/store";
-import { JobQueue } from "./queue";
+import { JobQueue } from "@lib/queue";
 import { DisposeFlag, ReadAndClearFlag } from "@common/flag";
-import { TileSetter } from "./tile-setter";
+import { TileSetter } from "@lib/tile-setter";
 
-import type { Camera } from "./camera";
-import type { Plane } from "@common/types";
-import type { Supervisor, SupervisorsResult } from "./supervisors/supervisor";
+import type { Camera } from "@lib/camera";
 import type { Painter } from "@lib/painters/painter";
+import type { Plane } from "@common/types";
+import type { TileWithKey, WithTileId } from "@common/tiles";
+import type {
+	Supervisor,
+	SupervisorsResult,
+} from "@lib/supervisors/supervisor";
 
 export class Composer<ST extends Supervisor<any, WithTileId>> {
-	private maxIter: number = 500;
-
+	private maxIterations: number;
 	private readonly disposeFlag: DisposeFlag;
 	private readonly painter: Painter<SupervisorsResult<ST>>;
 	private readonly store: TileStore<SupervisorsResult<ST>>;
@@ -27,12 +30,15 @@ export class Composer<ST extends Supervisor<any, WithTileId>> {
 		queue: JobQueue<ST>,
 		painter: Painter<SupervisorsResult<ST>>,
 		camera: Camera,
-		resolution: number,
+		resolution: number = 64,
+		iterations: number = 500,
 	) {
 		this.store = store;
 		this.queue = queue;
 		this.camera = camera;
 		this.painter = painter;
+		this.maxIterations = iterations;
+
 		this.tileSetter = new TileSetter(plane, resolution);
 		this.disposeFlag = new DisposeFlag();
 
@@ -73,26 +79,47 @@ export class Composer<ST extends Supervisor<any, WithTileId>> {
 		);
 	}
 
-	public getResolution(): number {
-		return this.tileSetter.getResolution();
-	}
-
 	public setResolution(resolution: number): void {
 		if (resolution != this.tileSetter.getResolution()) {
 			this.tileSetter.setResolution(resolution);
 			this.queue.clear();
 			this.store.clear();
+			this.tileSetter.clearRememberedView();
 			this.dirtyFlag.set();
 		}
 	}
 
+	public getResolution(): number {
+		return this.tileSetter.getResolution();
+	}
+
+	public setMaxIterations(iterations: number): void {
+		if (iterations != this.maxIterations) {
+			this.maxIterations = iterations;
+			this.queue.clear();
+			this.store.clear();
+			this.tileSetter.clearRememberedView();
+			this.dirtyFlag.set();
+		}
+	}
+
+	public getMaxIterations(): number {
+		return this.maxIterations;
+	}
+
 	private determineVisibleTiles(depth: number): TileWithKey[] {
 		return [
-			...this.tileSetter.layTiles(this.camera.viewportBounds(), depth - 3),
-			...this.tileSetter.layTiles(this.camera.viewportBounds(), depth - 2),
-			...this.tileSetter.layTiles(this.camera.viewportBounds(), depth - 1),
-			...this.tileSetter.layTiles(this.camera.viewportBounds(), depth),
+			...this.determineTilesPerDepth(depth - 3),
+			...this.determineTilesPerDepth(depth - 2),
+			...this.determineTilesPerDepth(depth - 1),
+			...this.determineTilesPerDepth(depth),
 		];
+	}
+
+	private determineTilesPerDepth(depth: number): TileWithKey[] {
+		return this.tileSetter
+			.layTiles(this.camera.viewportBounds(), depth)
+			.map((v) => v);
 	}
 
 	private prepareTiles(tiles: TileWithKey[]) {
@@ -105,7 +132,7 @@ export class Composer<ST extends Supervisor<any, WithTileId>> {
 				this.queue.enqueueEnd({
 					tile: tile,
 					tileId: tid,
-					maxIter: this.maxIter,
+					maxIter: this.maxIterations,
 				});
 			}
 		}
