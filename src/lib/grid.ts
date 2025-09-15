@@ -178,6 +178,14 @@ export class PlaneGridHandler {
 		}
 	}
 
+	public getQueueSize(): number | null {
+		if (this.jobQueue !== null) {
+			return this.jobQueue.getQueueSize();
+		} else {
+			return null;
+		}
+	}
+
 	private tick = () => {
 		this.composer?.draw();
 		this.rafNumber = requestAnimationFrame(this.tick);

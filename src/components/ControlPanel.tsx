@@ -13,11 +13,14 @@ const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 	const [poolSize, setPoolSize] = useAtom(planeGrid.poolSize);
 	const [resolution, setResolution] = useAtom(planeGrid.resolution);
 	const [iters, setIters] = useAtom(planeGrid.maxIterations);
+
 	const [busyness, setBusyness] = useState(planeGrid.getWorkerBusyness());
+	const [queue, setQueue] = useState(planeGrid.getQueueSize());
 
 	useInterval(
 		() => {
 			setBusyness(planeGrid.getWorkerBusyness());
+			setQueue(planeGrid.getQueueSize());
 		},
 		100,
 		[planeGrid],
@@ -70,7 +73,12 @@ const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 				/>
 				<p>{iters}</p>
 			</div>
-			{busyness && <BusynessDisplay busyness={busyness} />}
+			{busyness && queue !== null ? (
+				<div style={{ display: "flex", flexDirection: "row" }}>
+					<p style={{ marginRight: "10px" }}>{queue}</p>
+					<BusynessDisplay busyness={busyness} />
+				</div>
+			) : null}
 		</div>
 	);
 };
