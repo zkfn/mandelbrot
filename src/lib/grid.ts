@@ -109,6 +109,7 @@ export class PlaneGridHandler {
 			this.tilePainter,
 			this.camera,
 			this.store.get(this.resolution),
+			this.store.get(this.maxIterations),
 		);
 
 		this.tilePainter.setCanvas(this.canvas);
@@ -192,6 +193,7 @@ export class PlaneGridHandler {
 			this.tilePainter,
 			this.camera,
 			this.store.get(this.resolution),
+			this.store.get(this.maxIterations),
 		);
 	};
 
