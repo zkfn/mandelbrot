@@ -25,7 +25,8 @@
 			"@workers/*": ["./src/workers/*"],
 			"@comp/*": ["./src/components/*"],
 			"@lib/*": ["./src/lib/*"],
-			"@common/*": ["./src/common/*"]
+			"@common/*": ["./src/common/*"],
+			"@wasm/*": ["./src/wasm/*"]
 		}
 	}
 }

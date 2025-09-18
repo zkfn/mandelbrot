@@ -11,6 +11,7 @@ import type { Store } from "jotai/vanilla/store";
 import type { Plane } from "@common/types";
 import { bindAtom } from "@common/utils";
 import { resolutionValues } from "./resolution";
+import { ZigSupervisor } from "./supervisors/zig-supervisor";
 
 export class PlaneGridHandler {
 	private readonly zoomFactor = 0.001;
@@ -67,6 +68,8 @@ export class PlaneGridHandler {
 		this.lastPanCoord = [0, 0];
 		this.isPanning = false;
 
+		// TODO: new canvas dimensions after resize are not calculated properly
+		// as 100% of the bouding box.
 		this.resizeObserver = new ResizeObserver(this.updateCanvasDimensions);
 	}
 
@@ -77,7 +80,8 @@ export class PlaneGridHandler {
 		this.camera = new Camera(this.plane);
 		this.tileStore = new TileStore({});
 
-		this.jobQueue = new JobQueue(new TSSupervisor(), this.tileStore, {
+		// this.jobQueue = new JobQueue(new TSSupervisor(), this.tileStore, {
+		this.jobQueue = new JobQueue(new ZigSupervisor(), this.tileStore, {
 			poolSize: this.store.get(this.poolSize),
 		});
 
