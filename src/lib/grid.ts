@@ -13,6 +13,15 @@ import { bindAtom } from "@common/utils";
 import { resolutionValues } from "./resolution";
 import { ZigSupervisor } from "./supervisors/zig-supervisor";
 
+const modesToSupervisors = {
+	ts: new TSSupervisor(),
+	zig: new ZigSupervisor(),
+};
+
+export const modes = Object.keys(modesToSupervisors);
+
+export type Mode = keyof typeof modesToSupervisors;
+
 export class PlaneGridHandler {
 	private readonly zoomFactor = 0.001;
 	private readonly plane: Plane;
@@ -20,11 +29,13 @@ export class PlaneGridHandler {
 	public readonly maxIterations: PrimitiveAtom<number>;
 	public readonly poolSize: PrimitiveAtom<number>;
 	public readonly resolution: PrimitiveAtom<number>;
+	public readonly mode: PrimitiveAtom<Mode>;
 	public readonly store: Store;
 
 	private poolSizeUnsub: () => void;
 	private resolutionUnsub: () => void;
 	private maxIterationsUnsub: () => void;
+	private modeUnsub: () => void;
 
 	private composer: Composer<TSSupervisor> | null;
 	private jobQueue: JobQueue<TSSupervisor> | null;
@@ -51,12 +62,14 @@ export class PlaneGridHandler {
 		this.poolSizeUnsub = null!;
 		this.resolutionUnsub = null!;
 		this.maxIterationsUnsub = null!;
+		this.modeUnsub = null!;
 
 		// TODO this should have meaningful defaults
 		// and should be configurable via props.
 		this.poolSize = atomWithStorage("poolSize", 7);
 		this.resolution = atomWithStorage("resolution", resolutionValues[0]);
 		this.maxIterations = atomWithStorage("maxIterations", 500);
+		this.mode = atomWithStorage("mode", "ts" as Mode);
 		this.store = createStore();
 
 		this.composer = null;
@@ -81,9 +94,13 @@ export class PlaneGridHandler {
 		this.tileStore = new TileStore({});
 
 		// this.jobQueue = new JobQueue(new TSSupervisor(), this.tileStore, {
-		this.jobQueue = new JobQueue(new ZigSupervisor(), this.tileStore, {
-			poolSize: this.store.get(this.poolSize),
-		});
+		this.jobQueue = new JobQueue(
+			modesToSupervisors[this.store.get(this.mode)],
+			this.tileStore,
+			{
+				poolSize: this.store.get(this.poolSize),
+			},
+		);
 
 		this.composer = new Composer(
 			this.plane,
@@ -114,6 +131,8 @@ export class PlaneGridHandler {
 			this.maxIterations,
 			this.updateMaxIterations,
 		);
+
+		this.modeUnsub = bindAtom(this.store, this.mode, this.updateMode);
 
 		this.resizeObserver.observe(canvas);
 
@@ -150,11 +169,35 @@ export class PlaneGridHandler {
 		this.poolSizeUnsub();
 		this.resolutionUnsub();
 		this.maxIterationsUnsub();
+		this.modeUnsub();
 
 		this.composer?.dispose();
 		this.jobQueue?.dispose();
 		this.tileStore?.dispose();
 	}
+
+	public updateMode = (mode: Mode) => {
+		this.composer?.dispose();
+		this.jobQueue?.dispose();
+		this.tileStore.clear();
+
+		this.jobQueue = new JobQueue(modesToSupervisors[mode], this.tileStore, {
+			poolSize: this.store.get(this.poolSize),
+		});
+
+		this.composer = new Composer(
+			this.plane,
+			this.tileStore,
+			this.jobQueue,
+			this.tilePainter,
+			this.camera,
+			this.store.get(this.resolution),
+		);
+	};
+
+	public getMode = () => {
+		return this.mode;
+	};
 
 	public updatePoolSize = (poolSize: number): void => {
 		if (this.jobQueue !== null) {

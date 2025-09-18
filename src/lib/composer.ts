@@ -51,6 +51,7 @@ export class Composer<ST extends Supervisor<any, WithTileId>> {
 		this.disposeFlag.set();
 		this.queue.removeInvalidator(this.dirtyFlag.set);
 		this.camera.removeInvalidator(this.dirtyFlag.set);
+		this.tileSetter.clearRememberedView();
 	}
 
 	public draw() {

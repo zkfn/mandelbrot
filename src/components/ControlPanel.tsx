@@ -1,5 +1,5 @@
 import { useAtom } from "jotai";
-import type { PlaneGridHandler } from "@lib/grid";
+import { modes, type Mode, type PlaneGridHandler } from "@lib/grid";
 import { useState, type FC } from "react";
 import { resolutionValues } from "@lib/resolution";
 import useInterval from "@lib/hooks/useInterval";
@@ -13,6 +13,7 @@ const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 	const [poolSize, setPoolSize] = useAtom(planeGrid.poolSize);
 	const [resolution, setResolution] = useAtom(planeGrid.resolution);
 	const [iters, setIters] = useAtom(planeGrid.maxIterations);
+	const [mode, setMode] = useAtom(planeGrid.mode);
 
 	const [busyness, setBusyness] = useState(planeGrid.getWorkerBusyness());
 	const [queue, setQueue] = useState(planeGrid.getQueueSize());
@@ -47,6 +48,21 @@ const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 				/>
 				<p>{poolSize}</p>
 			</div>
+
+			<div style={{ display: "flex", flexDirection: "row" }}>
+				<select
+					name="mode"
+					value={mode}
+					onChange={(e) => {
+						setMode(e.target.value as Mode);
+					}}
+				>
+					{modes.map((m) => (
+						<option value={m}>{m}</option>
+					))}
+				</select>
+			</div>
+
 			<div style={{ display: "flex", flexDirection: "row" }}>
 				<input
 					type="range"

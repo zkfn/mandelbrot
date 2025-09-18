@@ -40,3 +40,8 @@ export fn render(min_x: f64, max_x: f64, min_y: f64, max_y: f64, w: u32, h: u32,
         }
     }
 }
+
+comptime {
+    _ = &render;
+    _ = &alloc;
+}
