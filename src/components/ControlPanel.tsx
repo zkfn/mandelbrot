@@ -16,11 +16,13 @@ const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 
 	const [busyness, setBusyness] = useState(planeGrid.getWorkerBusyness());
 	const [queue, setQueue] = useState(planeGrid.getQueueSize());
+	const [time, setTime] = useState(planeGrid.getRenderTimePerTile());
 
 	useInterval(
 		() => {
 			setBusyness(planeGrid.getWorkerBusyness());
 			setQueue(planeGrid.getQueueSize());
+			setTime(planeGrid.getRenderTimePerTile());
 		},
 		100,
 		[planeGrid],
@@ -73,6 +75,7 @@ const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 				/>
 				<p>{iters}</p>
 			</div>
+			{time !== null && <p>Time: {time.toFixed(2)} ms</p>}
 			{busyness && queue !== null ? (
 				<div style={{ display: "flex", flexDirection: "row" }}>
 					<p style={{ marginRight: "10px" }}>{queue}</p>

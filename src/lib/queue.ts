@@ -12,6 +12,7 @@ import type {
 
 type WorkerId = number;
 type Generation = number;
+type Timestamp = number;
 
 export interface JobQueueProps {
 	poolSize: number;
@@ -45,11 +46,17 @@ export class JobQueue<ST extends Supervisor<any, WithTileId>>
 
 	/** Jobs to do and assigned */
 	private readonly jobQueue: TileAssignment[];
-	private readonly assignments: Map<WorkerId, [Generation, TileAssignment]>;
+	private readonly assignments: Map<
+		WorkerId,
+		[Generation, Timestamp, TileAssignment]
+	>;
 
 	/** Composed classes */
 	private readonly supervisor: ST;
 	private readonly store: TileStore<SupervisorsResult<ST>>;
+
+	private total: number;
+	private times: number[];
 
 	public constructor(
 		supervisor: ST,
@@ -77,6 +84,9 @@ export class JobQueue<ST extends Supervisor<any, WithTileId>>
 		this.idle = [];
 		this.workersHired = 0;
 		this.generation = 0;
+
+		this.total = 0;
+		this.times = [];
 
 		this.hireWorkersUntilPoolSizeIsFilled();
 	}
@@ -123,6 +133,10 @@ export class JobQueue<ST extends Supervisor<any, WithTileId>>
 		return busyness;
 	}
 
+	public getRenderTimePerTile(): number {
+		return this.total / this.times.length;
+	}
+
 	public getQueueSize(): number {
 		return this.jobQueue.length;
 	}
@@ -148,6 +162,9 @@ export class JobQueue<ST extends Supervisor<any, WithTileId>>
 		this.disposeFlag.assertNotDisposed();
 		this.jobQueue.length = 0;
 		this.generation += 1;
+
+		this.total = 0;
+		this.times.length = 0;
 	}
 
 	public dispose(): void {
@@ -177,7 +194,11 @@ export class JobQueue<ST extends Supervisor<any, WithTileId>>
 			const workerId = this.idle.pop()!;
 			const worker = this.workers.get(workerId)!;
 
-			this.assignments.set(workerId, [this.generation, assignment]);
+			this.assignments.set(workerId, [
+				this.generation,
+				performance.now(),
+				assignment,
+			]);
 			this.store.setRendering(assignment.tileId);
 			this.supervisor.assignWorker(worker, assignment);
 
@@ -253,11 +274,20 @@ export class JobQueue<ST extends Supervisor<any, WithTileId>>
 		const genAssig = this.assignments.get(workerId);
 
 		if (genAssig) {
-			const [generation, _] = genAssig;
+			const [generation, timestamp, _] = genAssig;
 
 			this.assignments.delete(workerId);
 			this.supervisor.collectResult(message).then((value) => {
 				if (generation == this.generation) {
+					const delta = performance.now() - timestamp;
+					this.total += delta;
+					this.times.push(delta);
+
+					if (this.times.length > 100) {
+						const poped = this.times.shift()!;
+						this.total -= poped;
+					}
+
 					this.store.setReady(value.tileId, value as SupervisorsResult<ST>);
 					if (this.dirtyOnJobEnd) this.invalidatorPool.invalidate();
 				}
@@ -286,7 +316,7 @@ export class JobQueue<ST extends Supervisor<any, WithTileId>>
 
 			if (genAssig !== undefined) {
 				this.assignments.delete(workerId);
-				const [generation, assignment] = genAssig;
+				const [generation, _, assignment] = genAssig;
 
 				if (generation == this.generation) {
 					this.redoUnfinishedJobs(assignment);

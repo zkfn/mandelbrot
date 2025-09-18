@@ -190,6 +190,14 @@ export class PlaneGridHandler {
 		}
 	}
 
+	public getRenderTimePerTile(): number | null {
+		if (this.jobQueue !== null) {
+			return this.jobQueue.getRenderTimePerTile();
+		} else {
+			return null;
+		}
+	}
+
 	private tick = () => {
 		this.composer?.draw();
 		this.rafNumber = requestAnimationFrame(this.tick);
