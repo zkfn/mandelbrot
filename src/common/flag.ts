@@ -60,7 +60,7 @@ export class InvalidatorPool {
 			throw new Error("Removed invalidator was not present");
 		}
 
-		this.invalidators;
+		this.invalidators.delete(inv);
 	}
 }
 
