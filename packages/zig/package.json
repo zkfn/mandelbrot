@@ -1,0 +1,13 @@
+{
+	"name": "@mandelbrot/zig",
+	"version": "1.0.0",
+	"description": "",
+	"exports": {
+		".": "./index.ts",
+		"./wasm/*": "./zig-out/bin/*"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"type": "commonjs"
+}

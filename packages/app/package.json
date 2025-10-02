@@ -1,0 +1,16 @@
+{
+	"name": "@mandelbrot/app",
+	"private": true,
+	"type": "module",
+	"version": "1.0.0",
+	"dependencies": {
+		"@mandelbrot/common": "1.0.0",
+		"@mandelbrot/core": "1.0.0",
+		"@mandelbrot/workers": "1.0.0"
+	},
+	"description": "",
+	"main": "index.js",
+	"keywords": [],
+	"author": "",
+	"license": "ISC"
+}

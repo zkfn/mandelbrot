@@ -1,0 +1,16 @@
+{
+	"name": "@mandelbrot/workers",
+	"private": true,
+	"type": "module",
+	"version": "1.0.0",
+	"exports": {
+		"./*": "./src/*"
+	},
+	"dependencies": {
+		"@mandelbrot/common": "1.0.0",
+		"@mandelbrot/zig": "workspace:1.0.0"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC"
+}

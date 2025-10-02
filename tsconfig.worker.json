@@ -1,7 +1,0 @@
-{
-	"extends": "./tsconfig.webbase.json",
-	"compilerOptions": {
-		"lib": ["ES2022", "WebWorker"]
-	},
-	"include": ["src/workers/**/*", "src/common/**/*", "src/wasm/**/*"]
-}

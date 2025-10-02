@@ -1,8 +1,14 @@
 {
 	"files": [],
 	"references": [
-		{ "path": "./tsconfig.app.json" },
-		{ "path": "./tsconfig.worker.json" },
-		{ "path": "./tsconfig.node.json" }
-	]
+		{ "path": "./packages/app/tsconfig.json" },
+		{ "path": "./packages/workers/tsconfig.json" },
+		{ "path": "./packages/common/tsconfig.json" },
+		{ "path": "./packages/core/tsconfig.json" }
+	],
+	"compileOptions": {
+		"paths": {
+			"@mandelbrot/*": ["./packages/*/src"]
+		}
+	}
 }
