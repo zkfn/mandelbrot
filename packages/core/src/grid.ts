@@ -250,9 +250,7 @@ export class PlaneGridHandler {
 	};
 
 	private hookOntoDPR = () => {
-		this.dprQuery = matchMedia(
-			`(resolution: ${window.devicePixelRatio}dppx)`,
-		);
+		this.dprQuery = matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
 		this.dprQuery.addEventListener("change", this.updateAndRehook, {
 			once: true,
 		});

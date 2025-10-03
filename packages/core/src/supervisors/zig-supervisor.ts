@@ -3,8 +3,7 @@ import WasmWorker from "@mandelbrot/workers/simple_zig.ts?worker";
 import type { Supervisor } from "../supervisors/supervisor";
 
 export class ZigSupervisor
-	implements
-		Supervisor<TileResult<Uint8ClampedArray>, TileResult<ImageBitmap>>
+	implements Supervisor<TileResult<Uint8ClampedArray>, TileResult<ImageBitmap>>
 {
 	public hireWorker(): Worker {
 		return new WasmWorker();

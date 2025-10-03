@@ -23,15 +23,11 @@ const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 	const [queue, setQueue] = useState(planeGrid.getQueueSize());
 	const [time, setTime] = useState(planeGrid.getRenderTimePerTile());
 
-	useInterval(
-		() => {
-			setBusyness(planeGrid.getWorkerBusyness());
-			setQueue(planeGrid.getQueueSize());
-			setTime(planeGrid.getRenderTimePerTile());
-		},
-		100,
-		[planeGrid],
-	);
+	useInterval(() => {
+		setBusyness(planeGrid.getWorkerBusyness());
+		setQueue(planeGrid.getQueueSize());
+		setTime(planeGrid.getRenderTimePerTile());
+	}, 100);
 
 	return (
 		<div
@@ -75,9 +71,7 @@ const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 					step={1}
 					value={resolutionValues.indexOf(resolution)}
 					onChange={(e) => {
-						setResolution(
-							resolutionValues[e.currentTarget.valueAsNumber],
-						);
+						setResolution(resolutionValues[e.currentTarget.valueAsNumber]);
 					}}
 					style={{ width: 180, display: "block" }}
 				/>

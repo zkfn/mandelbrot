@@ -191,9 +191,7 @@ export class TileStore<Payload extends WithTileId> {
 		if (!record) {
 			this.tiles.set(tileId, { state: TileState.QUEUED });
 		} else if (record.state != TileState.QUEUED) {
-			throw new Error(
-				`Enqueueing a tile that is in the store: ${tileId}.`,
-			);
+			throw new Error(`Enqueueing a tile that is in the store: ${tileId}.`);
 		}
 	}
 
@@ -203,13 +201,9 @@ export class TileStore<Payload extends WithTileId> {
 		const tile = this.tiles.get(tileId);
 
 		if (!tile) {
-			throw new Error(
-				`Rendering a tile that is not in the store: ${tileId}.`,
-			);
+			throw new Error(`Rendering a tile that is not in the store: ${tileId}.`);
 		} else if (tile.state != TileState.QUEUED) {
-			throw new Error(
-				`Rendering a tile that is not enqueued: ${tileId}.`,
-			);
+			throw new Error(`Rendering a tile that is not enqueued: ${tileId}.`);
 		} else {
 			tile.state = TileState.RENDERING;
 		}
@@ -221,13 +215,9 @@ export class TileStore<Payload extends WithTileId> {
 		const tile = this.tiles.get(tileId);
 
 		if (!tile) {
-			throw new Error(
-				`Readying a tile that is not in the store: ${tileId}.`,
-			);
+			throw new Error(`Readying a tile that is not in the store: ${tileId}.`);
 		} else if (tile.state != TileState.RENDERING) {
-			throw new Error(
-				`Readying a tile that is not rendering: ${tileId}.`,
-			);
+			throw new Error(`Readying a tile that is not rendering: ${tileId}.`);
 		} else {
 			this.timeWheel.touch(tileId);
 			this.tiles.set(tileId, {
@@ -244,13 +234,9 @@ export class TileStore<Payload extends WithTileId> {
 			const tile = this.tiles.get(tileId);
 
 			if (!tile) {
-				throw new Error(
-					`Reseting a tile that is not in the store: ${tileId}.`,
-				);
+				throw new Error(`Reseting a tile that is not in the store: ${tileId}.`);
 			} else if (tile.state != TileState.RENDERING) {
-				throw new Error(
-					`Reseting a tile that is not rendering: ${tileId}.`,
-				);
+				throw new Error(`Reseting a tile that is not rendering: ${tileId}.`);
 			} else {
 				this.tiles.set(tileId, { state: TileState.QUEUED });
 			}

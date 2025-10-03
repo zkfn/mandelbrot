@@ -20,8 +20,12 @@ export function range(min: number, exclusive: number): number[] {
 }
 
 type OptionalKeys<T> = {
-	[K in keyof T]-?: {} extends Pick<T, K> ? K : never;
+	[K in keyof T]-?: Pick<T, K> extends Required<Pick<T, K>> ? never : K;
 }[keyof T];
+
+// type OptionalKeys<T> = {
+// 	[K in keyof T]-?: {} extends Pick<T, K> ? K : never;
+// }[keyof T];
 
 type RequiredOptionals<T> = {
 	[K in OptionalKeys<T>]-?: T[K];
@@ -49,10 +53,7 @@ export const bounds = (init: Bounds | null = null): Bounds => {
 };
 
 export const boundsCenter = (bounds: Bounds): [number, number] => {
-	return [
-		(bounds.minX + bounds.maxX) * 0.5,
-		(bounds.minY + bounds.maxY) * 0.5,
-	];
+	return [(bounds.minX + bounds.maxX) * 0.5, (bounds.minY + bounds.maxY) * 0.5];
 };
 
 export const boundsWidth = (bounds: Bounds): number => {

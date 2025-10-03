@@ -295,10 +295,7 @@ export class JobQueue<ST extends Supervisor<unknown, WithTileId>>
 						this.total -= poped;
 					}
 
-					this.store.setReady(
-						value.tileId,
-						value as SupervisorsResult<ST>,
-					);
+					this.store.setReady(value.tileId, value as SupervisorsResult<ST>);
 					if (this.dirtyOnJobEnd) this.invalidatorPool.invalidate();
 				}
 			});
