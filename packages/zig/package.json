@@ -2,6 +2,9 @@
 	"name": "@mandelbrot/zig",
 	"version": "1.0.0",
 	"description": "",
+	"scripts": {
+		"build": "zig build"
+	},
 	"exports": {
 		".": "./index.ts",
 		"./wasm/*": "./zig-out/bin/*"

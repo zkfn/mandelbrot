@@ -8,6 +8,10 @@ const relative = (p: string) => path.resolve(__dirname, p);
 // https://vite.dev/config/
 export default defineConfig({
 	root: __dirname,
+	build: {
+		outDir: "../../dist",
+		emptyOutDir: true,
+	},
 	plugins: [
 		react(),
 		recompile({
