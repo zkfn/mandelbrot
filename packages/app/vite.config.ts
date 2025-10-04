@@ -8,6 +8,7 @@ const relative = (p: string) => path.resolve(__dirname, p);
 // https://vite.dev/config/
 export default defineConfig({
 	root: __dirname,
+	base: '/mandelbrot/',
 	build: {
 		outDir: "../../dist",
 		emptyOutDir: true,
