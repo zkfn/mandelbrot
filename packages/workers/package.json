@@ -8,7 +8,7 @@
 	},
 	"dependencies": {
 		"@mandelbrot/common": "1.0.0",
-		"@mandelbrot/zig": "workspace:1.0.0"
+		"@mandelbrot/zig": "1.0.0"
 	},
 	"keywords": [],
 	"author": "",
