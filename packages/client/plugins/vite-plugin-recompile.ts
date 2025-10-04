@@ -55,13 +55,11 @@ export default function recompile(opts: RecompileOpts): Plugin {
 				if (event === "add" || event === "change" || event === "unlink") {
 					await run(`${event}:${filePath}`);
 					if (reload === "full") server.ws.send({ type: "full-reload" });
-					// for HMR you'd instead invalidate modules via server.moduleGraph
 				}
 			});
 		},
 
 		async buildStart() {
-			// This hook runs in both build and serve. Only run once if building.
 			if (process.env.NODE_ENV === "production") await run("build");
 		},
 	};
