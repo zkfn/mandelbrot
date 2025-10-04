@@ -4,7 +4,8 @@
 	"type": "module",
 	"version": "1.0.0",
 	"exports": {
-		"./*": "./src/*"
+		".": "./src/index.ts",
+		"./workers/*": "./workers/exported/*"
 	},
 	"dependencies": {
 		"@mandelbrot/common": "1.0.0",

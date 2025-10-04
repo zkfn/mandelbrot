@@ -1,5 +1,6 @@
-import type { TileAssignment, TileResult } from "@mandelbrot/common";
+import type { TileAssignment } from "@mandelbrot/common";
 import type { Bounds } from "@mandelbrot/common/types";
+import { workerMainFunc } from "../common";
 
 function renderMandelbrot(
 	section: Bounds,
@@ -37,19 +38,19 @@ function renderMandelbrot(
 	return out;
 }
 
-self.onmessage = (message: MessageEvent<TileAssignment>) => {
-	const data = message.data;
+workerMainFunc((assig: TileAssignment) => {
+	const width = Math.max(1, assig.tile.resolution.width || 0);
+	const height = Math.max(1, assig.tile.resolution.height || 0);
+	const maxIter = assig.maxIter;
 
-	const width = Math.max(1, data.tile.resolution.width || 0);
-	const height = Math.max(1, data.tile.resolution.height || 0);
-	const maxIter = data.maxIter ?? 500;
+	const pixels = renderMandelbrot(assig.tile.section, width, height, maxIter);
 
-	const pixels = renderMandelbrot(data.tile.section, width, height, maxIter);
-	const out: TileResult<ArrayBuffer> = {
-		tileId: data.tileId,
-		tile: data.tile,
-		payload: pixels.buffer,
+	return {
+		result: {
+			tileId: assig.tileId,
+			tile: assig.tile,
+			payload: pixels.buffer,
+		},
+		transfer: [pixels.buffer],
 	};
-
-	postMessage(out, [pixels.buffer]);
-};
+});

@@ -10,7 +10,8 @@
 	"description": "",
 	"main": "index.js",
 	"dependencies": {
-		"@mandelbrot/common": "1.0.0"
+		"@mandelbrot/common": "1.0.0",
+		"@mandelbrot/workers": "1.0.0"
 	},
 	"keywords": [],
 	"author": "",

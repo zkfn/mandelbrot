@@ -10,17 +10,15 @@ import { BitmapPainter, type BitmapResult } from "./painters/bitmap-painter";
 import { JobQueue } from "./queue";
 import { resolutionValues } from "./resolution";
 import { TileStore } from "./store";
-import { TSSupervisor } from "./supervisors/ts-supervisor";
-import { ZigSupervisor } from "./supervisors/zig-supervisor";
 
-const modesToSupervisors = {
-	ts: new TSSupervisor(),
-	zig: new ZigSupervisor(),
+const modesToWorkers = {
+	ts: null,
+	zig: null,
 };
 
-export const modes = Object.keys(modesToSupervisors);
+export const modes = Object.keys(modesToWorkers);
 
-export type Mode = keyof typeof modesToSupervisors;
+export type Mode = keyof typeof modesToWorkers;
 
 export class PlaneGridHandler {
 	private readonly zoomFactor = 0.001;
@@ -38,8 +36,8 @@ export class PlaneGridHandler {
 	private maxIterationsUnsub: () => void;
 	private modeUnsub: () => void;
 
-	private composer: Composer<TSSupervisor> | null;
-	private jobQueue: JobQueue<TSSupervisor> | null;
+	private composer: Composer | null;
+	private jobQueue: JobQueue | null;
 	private tilePainter: BitmapPainter;
 	private tileStore: TileStore<BitmapResult>;
 	private camera: Camera;
@@ -95,13 +93,7 @@ export class PlaneGridHandler {
 		this.tileStore = new TileStore({});
 
 		// this.jobQueue = new JobQueue(new TSSupervisor(), this.tileStore, {
-		this.jobQueue = new JobQueue(
-			modesToSupervisors[this.store.get(this.mode)],
-			this.tileStore,
-			{
-				poolSize: this.store.get(this.poolSize),
-			},
-		);
+		this.jobQueue = new JobQueue(this.store.get(this.poolSize), this.tileStore);
 
 		this.composer = new Composer(
 			this.plane,
@@ -178,14 +170,12 @@ export class PlaneGridHandler {
 		this.tileStore?.dispose();
 	}
 
-	public updateMode = (mode: Mode) => {
+	public updateMode = () => {
 		this.composer?.dispose();
 		this.jobQueue?.dispose();
 		this.tileStore.clear();
 
-		this.jobQueue = new JobQueue(modesToSupervisors[mode], this.tileStore, {
-			poolSize: this.store.get(this.poolSize),
-		});
+		this.jobQueue = new JobQueue(this.store.get(this.poolSize), this.tileStore);
 
 		this.composer = new Composer(
 			this.plane,

@@ -14,9 +14,3 @@ export interface WasmExports {
 	render: RenderFn;
 	alloc: (len: number) => number;
 }
-
-export async function loadWasm(url: string): Promise<WasmExports> {
-	const res = await fetch(url);
-	const { instance } = await WebAssembly.instantiateStreaming(res, {});
-	return instance.exports as unknown as WasmExports;
-}

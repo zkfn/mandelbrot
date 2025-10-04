@@ -1,19 +1,18 @@
-import type { TileWithKey, WithTileId } from "@mandelbrot/common";
+import type { TileResult, TileWithKey } from "@mandelbrot/common";
 import { DisposeFlag, ReadAndClearFlag, tileKeyToId } from "@mandelbrot/common";
 import type { Plane } from "@mandelbrot/common/types";
 import type { Camera } from "./camera";
 import type { Painter } from "./painters";
 import { JobQueue } from "./queue";
 import { TileState, TileStore } from "./store";
-import type { Supervisor, SupervisorsResult } from "./supervisors";
 import { TileSetter } from "./tile-setter";
 
-export class Composer<ST extends Supervisor<unknown, WithTileId>> {
+export class Composer {
 	private maxIterations: number;
 	private readonly disposeFlag: DisposeFlag;
-	private readonly painter: Painter<SupervisorsResult<ST>>;
-	private readonly store: TileStore<SupervisorsResult<ST>>;
-	private readonly queue: JobQueue<ST>;
+	private readonly painter: Painter<TileResult<ImageBitmap>>;
+	private readonly store: TileStore<TileResult<ImageBitmap>>;
+	private readonly queue: JobQueue;
 
 	private readonly tileSetter: TileSetter;
 	private readonly camera: Camera;
@@ -21,9 +20,9 @@ export class Composer<ST extends Supervisor<unknown, WithTileId>> {
 
 	public constructor(
 		plane: Plane,
-		store: TileStore<SupervisorsResult<ST>>,
-		queue: JobQueue<ST>,
-		painter: Painter<SupervisorsResult<ST>>,
+		store: TileStore<TileResult<ImageBitmap>>,
+		queue: JobQueue,
+		painter: Painter<TileResult<ImageBitmap>>,
 		camera: Camera,
 		resolution: number = 64,
 		iterations: number = 500,

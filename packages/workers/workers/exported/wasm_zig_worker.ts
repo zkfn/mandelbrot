@@ -1,6 +1,7 @@
 import type { TileAssignment, TileResult } from "@mandelbrot/common";
-import { loadWasm, type WasmExports } from "@mandelbrot/zig";
+import type { WasmExports } from "@mandelbrot/zig";
 import workerUrl from "@mandelbrot/zig/wasm/simple_worker.wasm?url";
+import { loadWasm, workerMainFunc } from "../common";
 
 let wasm: WasmExports;
 let ptr = 0;
@@ -25,26 +26,27 @@ const getWasm = async () => {
 	return wasm;
 };
 
-self.onmessage = async (message: MessageEvent<TileAssignment>) => {
+workerMainFunc(async (assignment: TileAssignment) => {
 	const wasm = await getWasm();
-	const data = message.data;
 
-	const width = Math.max(1, data.tile.resolution.width || 0);
-	const height = Math.max(1, data.tile.resolution.height || 0);
+	const width = Math.max(1, assignment.tile.resolution.width || 0);
+	const height = Math.max(1, assignment.tile.resolution.height || 0);
 
-	const maxIter = data.maxIter ?? 500;
+	const maxIter = assignment.maxIter;
 	const size = width * height * 4;
 
-	const { minX, maxX, minY, maxY } = data.tile.section;
+	const { minX, maxX, minY, maxY } = assignment.tile.section;
 
 	reallocIfNeeded(size);
 	wasm.render(minX, maxX, minY, maxY, width, height, maxIter, ptr);
 
-	const out: TileResult<ArrayBuffer> = {
-		tileId: data.tileId,
-		tile: data.tile,
+	const result: TileResult<ArrayBuffer> = {
+		tileId: assignment.tileId,
+		tile: assignment.tile,
 		payload: buffer,
 	};
 
-	postMessage(out);
-};
+	return {
+		result,
+	};
+});
