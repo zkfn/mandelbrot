@@ -1,6 +1,5 @@
 import type { TileId, WithTileId } from "@mandelbrot/common";
 import { DisposeFlag } from "@mandelbrot/common";
-import { withDefaultProps } from "@mandelbrot/common/utils";
 
 export enum TileState {
 	QUEUED,
@@ -117,22 +116,13 @@ export interface TileStoreProps {
 	capacity: number;
 }
 
-const storeDefaultProps: TileStoreProps = {
-	minAge: 5,
-	maxAge: 0,
-	capacity: 5000,
-};
-
 export class TileStore<Payload extends WithTileId> {
 	private readonly tiles: Map<TileId, TileRecord<Payload>>;
 	private readonly timeWheel: TimeWheel<TileId>;
 	private readonly disposeFlag: DisposeFlag;
 
 	public constructor(props: Partial<TileStoreProps>) {
-		const { minAge, maxAge, capacity } = withDefaultProps(
-			props,
-			storeDefaultProps,
-		);
+		const { minAge = 5, maxAge = 0, capacity = 5000 } = props;
 
 		this.tiles = new Map();
 		this.timeWheel = new TimeWheel(capacity, minAge, maxAge);

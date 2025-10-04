@@ -5,7 +5,6 @@ import type {
 	WithTileId,
 } from "@mandelbrot/common";
 import { DisposeFlag, InvalidatorPool } from "@mandelbrot/common";
-import { withDefaultProps } from "@mandelbrot/common/utils";
 import { TileStore } from "./store";
 import type {
 	Supervisor,
@@ -22,12 +21,6 @@ export interface JobQueueProps {
 	dirtyOnJobEnd: boolean;
 	dirtyOnJobStart: boolean;
 }
-
-const queueDefaultProps: JobQueueProps = {
-	poolSize: 1,
-	dirtyOnJobStart: false,
-	dirtyOnJobEnd: true,
-};
 
 export class JobQueue<ST extends Supervisor<unknown, WithTileId>>
 	implements Invalidable
@@ -66,10 +59,11 @@ export class JobQueue<ST extends Supervisor<unknown, WithTileId>>
 		store: TileStore<SupervisorsResult<ST>>,
 		props: Partial<JobQueueProps>,
 	) {
-		const { poolSize, dirtyOnJobStart, dirtyOnJobEnd } = withDefaultProps(
-			props,
-			queueDefaultProps,
-		);
+		const {
+			poolSize = 1,
+			dirtyOnJobStart = false,
+			dirtyOnJobEnd = true,
+		} = props;
 
 		this.store = store;
 		this.supervisor = supervisor;
