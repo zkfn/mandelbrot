@@ -2,6 +2,7 @@ import type { Atom } from "jotai";
 import type { Store } from "jotai/vanilla/store";
 import type { Bounds, Plane, Rect } from "./types";
 
+// TODO this should be in client
 export const bindAtom = <T>(
 	store: Store,
 	atom: Atom<T>,

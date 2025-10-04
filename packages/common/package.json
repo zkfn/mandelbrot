@@ -5,7 +5,8 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./utils": "./src/utils.ts",
-		"./types": "./src/types.ts"
+		"./types": "./src/types.ts",
+		"./asserts": "./src/asserts.ts"
 	},
 	"devDependencies": {},
 	"keywords": [],

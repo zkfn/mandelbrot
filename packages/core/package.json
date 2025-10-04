@@ -4,7 +4,8 @@
 	"type": "module",
 	"version": "1.0.0",
 	"exports": {
-		".": "./src/index.ts"
+		".": "./src/index.ts",
+		"./datastructs/*": "./src/datastructs/*"
 	},
 	"description": "",
 	"main": "index.js",
