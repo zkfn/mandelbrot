@@ -5,6 +5,9 @@
 	"workspaces": [
 		"packages/*"
 	],
+	"lint-staged": {
+		"*.{ts|tsx}": "biome format --write && eslint"
+	},
 	"type": "module",
 	"scripts": {
 		"dev": "vite --config ./packages/client/vite.config.ts",
@@ -14,7 +17,7 @@
 		"check": "tsc -b --noEmit",
 		"lint": "eslint .",
 		"all": "npm run format && npm run lint && npm run check && npm run build",
-		"format": "biome format --write ./packages/",
+		"format": "biome format ./packages/",
 		"preview": "vite preview --config ./packages/client/vite.config.ts",
 		"prepare": "husky"
 	},
@@ -36,6 +39,7 @@
 		"eslint-plugin-react-refresh": "^0.4.20",
 		"globals": "^16.3.0",
 		"husky": "^9.1.7",
+		"lint-staged": "^16.2.3",
 		"typescript": "~5.8.3",
 		"typescript-eslint": "^8.39.1",
 		"vite": "^7.1.2"
