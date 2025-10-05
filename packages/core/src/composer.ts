@@ -4,7 +4,7 @@ import type { Plane } from "@mandelbrot/common/types";
 import type { Camera } from "./camera";
 import type { Painter } from "./painters";
 import { JobQueue } from "./queue";
-import { TileState, TileStore } from "./store";
+import { TileStore } from "./store";
 import { TileSetter } from "./tile-setter";
 
 export class Composer {
@@ -122,8 +122,7 @@ export class Composer {
 			const tid = tileKeyToId(tile.key);
 			const record = this.store.getTile(tid);
 
-			if (!record || record.state == TileState.QUEUED) {
-				this.store.setQueued(tid);
+			if (record === undefined) {
 				this.queue.enqueueEnd({
 					tile: tile,
 					tileId: tid,

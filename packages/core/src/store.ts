@@ -3,13 +3,12 @@ import { DisposeFlag } from "@mandelbrot/common";
 import Cache from "./datastructs/cache";
 
 export enum TileState {
-	QUEUED,
 	RENDERING,
 	READY,
 }
 
 type TileRecordWithoutPayload = {
-	state: TileState.QUEUED | TileState.RENDERING;
+	state: TileState.RENDERING;
 };
 
 type TileRecordWithPayload<Payload extends WithTileId> = {
@@ -85,9 +84,6 @@ export class TileStore<Payload extends WithTileId> {
 				}
 			}
 
-			case TileState.QUEUED:
-				return { state: TileState.QUEUED };
-
 			case TileState.RENDERING:
 				return { state: TileState.RENDERING };
 
@@ -96,27 +92,13 @@ export class TileStore<Payload extends WithTileId> {
 		}
 	}
 
-	public setQueued(tileId: TileId): void {
-		this.disposeFlag.assertNotDisposed();
-
-		const state = this.states.get(tileId);
-
-		if (state === undefined) {
-			this.states.set(tileId, TileState.QUEUED);
-		} else if (state !== TileState.QUEUED) {
-			throw new Error(`Enqueueing a tile that is in the store: ${tileId}.`);
-		}
-	}
-
 	public setRendering(tileId: TileId): void {
 		this.disposeFlag.assertNotDisposed();
 
 		const state = this.states.get(tileId);
 
-		if (state === undefined) {
-			throw new Error(`Rendering a tile that is not in the store: ${tileId}.`);
-		} else if (state !== TileState.QUEUED) {
-			throw new Error(`Rendering a tile that is not enqueued: ${tileId}.`);
+		if (state !== undefined) {
+			throw new Error(`Rendering a tile that is already in store: ${tileId}.`);
 		} else {
 			this.states.set(tileId, TileState.RENDERING);
 		}
@@ -148,7 +130,7 @@ export class TileStore<Payload extends WithTileId> {
 			} else if (state != TileState.RENDERING) {
 				throw new Error(`Reseting a tile that is not rendering: ${tileId}.`);
 			} else {
-				this.states.set(tileId, TileState.QUEUED);
+				this.states.delete(tileId);
 			}
 		});
 	}
