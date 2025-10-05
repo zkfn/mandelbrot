@@ -2,7 +2,9 @@ import {
 	ReadAndClearFlag,
 	type TileAssignment,
 	type TileResult,
+	Tiler,
 	type Unsubscribe,
+	ViewCornerTiles,
 } from "@mandelbrot/common";
 import { assertGtZero } from "@mandelbrot/common/asserts";
 import {
@@ -62,8 +64,10 @@ export default class Orchestrator<Result, Immediate = unknown> {
 	private cache: Cache<TileResult<Result>>;
 	private pool: WorkerPool<TileAssignment, TileResult<Immediate>>;
 	private painter: Painter<Result>;
+	private tiler: Tiler;
 
 	private dirtyFlag: ReadAndClearFlag;
+	private previousView: ViewCornerTiles | null;
 
 	private supervisor: SubscribableSupervisor<
 		TileAssignment,
@@ -96,6 +100,8 @@ export default class Orchestrator<Result, Immediate = unknown> {
 
 		const { jobDone, jobRedo, jobAssign } = callbacks;
 
+		this.previousView = null;
+
 		this.maxIters = maxIters;
 		this.camera = camera;
 		this.painter = painter;
@@ -108,11 +114,13 @@ export default class Orchestrator<Result, Immediate = unknown> {
 		this.dirtyFlag = new ReadAndClearFlag(true);
 		this.cache = new Cache();
 		this.pool = new WorkerPool(supervisor, poolSize);
+		this.tiler = new Tiler(camera.planeSide, tileSize);
+
 		this.composer = new ImageComposer(
-			tileSize,
 			this.camera,
 			this.cache,
 			this.painter,
+			this.tiler,
 		);
 
 		this.camera.addInvalidator(this.dirtyFlag.set);
@@ -126,39 +134,39 @@ export default class Orchestrator<Result, Immediate = unknown> {
 
 		const misses = this.composer.compose();
 
-		if (misses !== null) {
-			this.pool.clearQueue();
+		if (this.didViewChange())
+			if (misses !== null) {
+				this.pool.clearQueue();
 
-			const rendering = new Set(
-				this.pool.getRunningJobs().map((job) => job.tileId),
-			);
+				const rendering = new Set(
+					this.pool.getRunningJobs().map((job) => job.tileId),
+				);
 
-			const assignments: TileAssignment[] = misses
-				.filter((tile) => !rendering.has(tile.tileId))
-				.map((tile) => ({
-					tileId: tile.tileId,
-					tile,
-					maxIter: this.maxIters,
-				}));
+				const assignments: TileAssignment[] = misses
+					.filter((tile) => !rendering.has(tile.tileId))
+					.map((tile) => ({
+						tileId: tile.tileId,
+						tile,
+						maxIter: this.maxIters,
+					}));
 
-			this.pool.enqueueEnd(...assignments);
-		}
+				this.pool.enqueueEnd(...assignments);
+			}
 	}
 
 	public dispose(): void {
 		this.unsubAll();
 		this.cache.clear();
 		this.pool.dispose();
-		this.composer.invalidateRememberedView();
 	}
 
 	public getTileSize(): number {
-		return this.composer.getTileSize();
+		return this.tiler.getTileSize();
 	}
 
 	public setTileSize(tileSize: number) {
 		if (tileSize != this.getTileSize()) {
-			this.composer.setTileSize(tileSize);
+			this.tiler.setTileSize(tileSize);
 			this.flush();
 		}
 	}
@@ -193,7 +201,7 @@ export default class Orchestrator<Result, Immediate = unknown> {
 	}
 
 	private flush() {
-		this.composer.invalidateRememberedView();
+		this.previousView = null;
 		this.cache.clear();
 		this.pool.clearQueueAndInvalidateRunningJobs();
 		this.dirtyFlag.set();
@@ -223,6 +231,20 @@ export default class Orchestrator<Result, Immediate = unknown> {
 					this.appendContext(this.jobAssign),
 				),
 			);
+		}
+	}
+
+	private didViewChange(): boolean {
+		const corners = this.tiler.cornerTiles(
+			this.camera.viewportBounds(),
+			this.camera.getDepthPerResolution(this.tiler.getTileSize()),
+		);
+
+		if (!this.previousView || !this.previousView.isSameAs(corners)) {
+			this.previousView = corners;
+			return true;
+		} else {
+			return false;
 		}
 	}
 

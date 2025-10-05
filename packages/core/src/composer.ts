@@ -1,54 +1,35 @@
 import {
 	type TileResult,
+	Tiler,
 	type TileWithKey,
 	type TileWithKeyAndID,
 	tileKeyToId,
 } from "@mandelbrot/common";
-import { assertGtZero } from "@mandelbrot/common/asserts";
 import type Cache from "./cache";
 import type Camera from "./camera";
 import type Painter from "./painter";
-import { TileSetter } from "./tile-setter";
 
 export default class ImageComposer<Paintable> {
 	private painter: Painter<Paintable>;
 	private cache: Cache<TileResult<Paintable>>;
 	private camera: Camera;
-	private tileSetter: TileSetter;
+	private tiler: Tiler;
 
 	public constructor(
-		tileSize: number,
 		camera: Camera,
 		cache: Cache<TileResult<Paintable>>,
 		painter: Painter<Paintable>,
+		tiler: Tiler,
 	) {
-		assertGtZero(tileSize);
-
 		this.camera = camera;
 		this.painter = painter;
 		this.cache = cache;
-
-		this.tileSetter = new TileSetter(camera.planeSide, tileSize);
+		this.tiler = tiler;
 	}
 
-	public setTileSize(tileSize: number): void {
-		assertGtZero(tileSize);
-		this.tileSetter.setResolution(tileSize);
-	}
-
-	// TODO this is a hack, move this logic one level up
-	public invalidateRememberedView(): void {
-		this.tileSetter.clearRememberedView();
-	}
-
-	public getTileSize(): number {
-		return this.tileSetter.getResolution();
-	}
-
-	public compose(): TileWithKeyAndID[] | null {
-		const bounds = this.camera.viewportBounds();
-		const resolution = this.tileSetter.getResolution();
-		const depth = this.camera.getDepthPerResolution(resolution);
+	public compose(): TileWithKeyAndID[] {
+		const tileSize = this.tiler.getTileSize();
+		const depth = this.camera.getDepthPerResolution(tileSize);
 		const tiles = this.determineVisibleTiles(depth);
 
 		const cacheMisses: TileWithKeyAndID[] = [];
@@ -71,13 +52,7 @@ export default class ImageComposer<Paintable> {
 		this.painter.clearCanvas();
 		this.painter.paintTiles(cacheHits);
 
-		// TODO move this out
-		if (this.tileSetter.didViewChange(bounds, depth)) {
-			return cacheMisses;
-		} else {
-			/** If view didn't change, we dont have to return new misses */
-			return null;
-		}
+		return cacheMisses;
 	}
 
 	private determineVisibleTiles(depth: number): TileWithKey[] {
@@ -90,7 +65,7 @@ export default class ImageComposer<Paintable> {
 	}
 
 	private determineTilesPerDepth(depth: number): TileWithKey[] {
-		return this.tileSetter
+		return this.tiler
 			.layTiles(this.camera.viewportBounds(), depth)
 			.map((v) => v);
 	}
