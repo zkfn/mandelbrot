@@ -38,7 +38,7 @@ export class BitmapPainter implements Painter<ImageBitmap> {
 		this.assertInit();
 
 		this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-		this.ctx.fillStyle = "#fff";
+		this.ctx.fillStyle = "#111";
 		this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 		this.ctx.strokeStyle = "#000";
 		this.ctx.lineWidth = 1;

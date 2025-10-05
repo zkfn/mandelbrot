@@ -119,6 +119,14 @@ export default class Cache<Value> {
 		this.pruneOldAndExtraItems();
 	}
 
+	public getCapacity(): number {
+		return this.maxCapacity;
+	}
+
+	public getCacheUse(): number {
+		return this.rememberedItems;
+	}
+
 	public setMaxAge(age: number): void {
 		this.maxAge = age;
 		this.pruneOldAndExtraItems();

@@ -1,7 +1,7 @@
 import type { Plane } from "@mandelbrot/common/types";
-import { PlaneGridHandler } from "@mandelbrot/core";
+import { Grid } from "@mandelbrot/core";
 import { Provider } from "jotai";
-import { type FC, useLayoutEffect, useMemo, useRef } from "react";
+import { type FC, useLayoutEffect, useRef, useState } from "react";
 import ControlPanel from "./ControlPanel";
 
 interface GridViewerProps {
@@ -10,25 +10,18 @@ interface GridViewerProps {
 
 const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null!);
-	const planeGrid = useMemo<PlaneGridHandler>(
-		() => new PlaneGridHandler(plane),
-		[plane],
-	);
-
-	const assertCanvas = (): HTMLCanvasElement => {
-		if (!canvasRef.current) {
-			throw Error("Canvas ref is empty.");
-		}
-
-		return canvasRef.current;
-	};
+	const wrapperRef = useRef<HTMLDivElement>(null!);
+	const planeGrid = useRef<Grid>(null!);
+	const [ready, setReady] = useState(false);
 
 	useLayoutEffect(() => {
-		const canvas = assertCanvas();
-		planeGrid.attachToCanvas(canvas);
+		planeGrid.current = new Grid(plane, canvasRef.current, wrapperRef.current);
+
+		setReady(true);
 
 		return () => {
-			planeGrid.deattachFromCanvas();
+			planeGrid.current.dispose();
+			setReady(false);
 		};
 	}, [plane, planeGrid]);
 
@@ -41,17 +34,28 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 				height: "100%",
 			}}
 		>
-			<canvas
-				ref={canvasRef}
+			<div
+				ref={wrapperRef}
 				style={{
 					width: "100%",
 					height: "100%",
-					display: "block",
+					overflow: "hidden",
 				}}
-			/>
-			<Provider store={planeGrid.store}>
-				<ControlPanel planeGrid={planeGrid} />
-			</Provider>
+			>
+				<canvas
+					ref={canvasRef}
+					style={{
+						width: "100%",
+						height: "100%",
+						display: "block",
+					}}
+				/>
+			</div>
+			{ready && (
+				<Provider store={planeGrid.current.store}>
+					<ControlPanel planeGrid={planeGrid.current} />
+				</Provider>
+			)}
 		</div>
 	);
 };

@@ -134,30 +134,38 @@ export default class Orchestrator<Result, Immediate = unknown> {
 
 		const misses = this.composer.compose();
 
-		if (this.didViewChange())
-			if (misses !== null) {
-				this.pool.clearQueue();
+		if (this.didViewChange()) {
+			this.pool.clearQueue();
 
-				const rendering = new Set(
-					this.pool.getRunningJobs().map((job) => job.tileId),
-				);
+			const rendering = new Set(
+				this.pool.getRunningJobs().map((job) => job.tileId),
+			);
 
-				const assignments: TileAssignment[] = misses
-					.filter((tile) => !rendering.has(tile.tileId))
-					.map((tile) => ({
-						tileId: tile.tileId,
-						tile,
-						maxIter: this.maxIters,
-					}));
+			const assignments: TileAssignment[] = misses
+				.filter((tile) => !rendering.has(tile.tileId))
+				.map((tile) => ({
+					tileId: tile.tileId,
+					tile,
+					maxIter: this.maxIters,
+				}));
 
-				this.pool.enqueueEnd(...assignments);
-			}
+			this.pool.enqueueEnd(...assignments);
+			this.cache.tick();
+		}
 	}
 
 	public dispose(): void {
 		this.unsubAll();
 		this.cache.clear();
 		this.pool.dispose();
+	}
+
+	public getCacheUse(): number {
+		return this.cache.getCacheUse();
+	}
+
+	public getCacheCapacity(): number {
+		return this.cache.getCapacity();
 	}
 
 	public getTileSize(): number {

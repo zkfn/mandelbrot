@@ -1,16 +1,4 @@
-import type { Atom } from "jotai";
-import type { Store } from "jotai/vanilla/store";
 import type { Bounds, Plane, Rect } from "./types";
-
-// TODO this should be in client
-export const bindAtom = <T>(
-	store: Store,
-	atom: Atom<T>,
-	apply: (value: T) => void,
-): (() => void) => {
-	apply(store.get(atom));
-	return store.sub(atom, () => apply(store.get(atom)));
-};
 
 export function clamp(min: number, val: number, max: number): number {
 	return Math.min(max, Math.max(min, val));

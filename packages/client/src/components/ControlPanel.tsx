@@ -1,7 +1,7 @@
 import {
-	type Mode,
-	modes,
-	type PlaneGridHandler,
+	Grid,
+	type OrchestratorName,
+	orchestratorNames,
 	resolutionValues,
 } from "@mandelbrot/core";
 import { useAtom } from "jotai";
@@ -10,23 +10,31 @@ import useInterval from "../hooks/useInterval";
 import BusynessDisplay from "./BusynessDisplay";
 
 interface ControlPanelProps {
-	planeGrid: PlaneGridHandler;
+	planeGrid: Grid;
 }
 
 const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 	const [poolSize, setPoolSize] = useAtom(planeGrid.poolSize);
-	const [resolution, setResolution] = useAtom(planeGrid.resolution);
-	const [iters, setIters] = useAtom(planeGrid.maxIterations);
-	const [mode, setMode] = useAtom(planeGrid.mode);
+	const [resolution, setResolution] = useAtom(planeGrid.tileSize);
+	const [iters, setIters] = useAtom(planeGrid.maxIters);
+	const [orchName, setOrchNam] = useAtom(planeGrid.orchestratorName);
 
-	const [busyness, setBusyness] = useState(planeGrid.getWorkerBusyness());
-	const [queue, setQueue] = useState(planeGrid.getQueueSize());
-	const [time, setTime] = useState(planeGrid.getRenderTimePerTile());
+	const [cacheUse, setCacheUse] = useState(
+		planeGrid.orchestrator.getCacheUse(),
+	);
+	const [cacheCapacity, setCacheCapacity] = useState(
+		planeGrid.orchestrator.getCacheCapacity(),
+	);
+	const [queue, setQueue] = useState(planeGrid.orchestrator.getQueueSize());
+	const [busyness, setBusyness] = useState(
+		planeGrid.orchestrator.getWorkerBusyness(),
+	);
 
 	useInterval(() => {
-		setBusyness(planeGrid.getWorkerBusyness());
-		setQueue(planeGrid.getQueueSize());
-		setTime(planeGrid.getRenderTimePerTile());
+		setBusyness(planeGrid.orchestrator.getWorkerBusyness());
+		setQueue(planeGrid.orchestrator.getQueueSize());
+		setCacheUse(planeGrid.orchestrator.getCacheUse());
+		setCacheCapacity(planeGrid.orchestrator.getCacheCapacity());
 	}, 100);
 
 	return (
@@ -52,13 +60,13 @@ const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 			<div style={{ display: "flex", flexDirection: "row" }}>
 				<select
 					name="mode"
-					value={mode}
+					value={orchName}
 					onChange={(e) => {
-						setMode(e.target.value as Mode);
+						setOrchNam(e.target.value as OrchestratorName);
 					}}
 				>
-					{modes.map((m) => (
-						<option value={m}>{m}</option>
+					{orchestratorNames.map((on) => (
+						<option value={on}>{on}</option>
 					))}
 				</select>
 			</div>
@@ -91,13 +99,19 @@ const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 				/>
 				<p>{iters}</p>
 			</div>
-			{time !== null && <p>Time: {time.toFixed(2)} ms</p>}
 			{busyness && queue !== null ? (
 				<div style={{ display: "flex", flexDirection: "row" }}>
 					<p style={{ marginRight: "10px" }}>{queue}</p>
 					<BusynessDisplay busyness={busyness} />
 				</div>
 			) : null}
+
+			<div style={{ display: "flex", flexDirection: "row" }}>
+				<p>
+					{cacheUse}
+					{cacheCapacity ? `/${cacheCapacity}` : ""}
+				</p>
+			</div>
 		</div>
 	);
 };
