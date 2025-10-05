@@ -1,19 +1,19 @@
 import type { Plane } from "@mandelbrot/common/types";
 import { bindAtom } from "@mandelbrot/common/utils";
 import { Camera } from "@mandelbrot/core";
+import TSWorker from "@mandelbrot/workers/workers/ts_worker.ts?worker";
+import WASMWorker from "@mandelbrot/workers/workers/wasm_zig_worker.ts?worker";
 import type { PrimitiveAtom } from "jotai";
 import { createStore } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import type { Store } from "jotai/vanilla/store";
-import { Composer } from "./composer";
-import { BitmapPainter, type BitmapResult } from "./painters/bitmap-painter";
-import { JobQueue } from "./queue";
+import { createBitmapOrchestrator } from "./datastructs/bitmaps";
+import type Orchestrator from "./datastructs/orchestrator";
 import { resolutionValues } from "./resolution";
-import { TileStore } from "./store";
 
 const modesToWorkers = {
-	ts: null,
-	zig: null,
+	ts: TSWorker,
+	zig: WASMWorker,
 };
 
 export const modes = Object.keys(modesToWorkers);
@@ -36,11 +36,8 @@ export class PlaneGridHandler {
 	private maxIterationsUnsub: () => void;
 	private modeUnsub: () => void;
 
-	private composer: Composer | null;
-	private jobQueue: JobQueue | null;
-	private tilePainter: BitmapPainter;
-	private tileStore: TileStore<BitmapResult>;
 	private camera: Camera;
+	private orchestrator: Orchestrator<ImageBitmap, ArrayBufferLike>;
 
 	private lastPanCoord: [number, number];
 	private isPanning: boolean;
@@ -54,9 +51,7 @@ export class PlaneGridHandler {
 		this.plane = plane;
 
 		this.camera = null!;
-		this.tilePainter = null!;
-		this.tileStore = null!;
-		this.jobQueue = null!;
+		this.orchestrator = null!;
 
 		this.poolSizeUnsub = null!;
 		this.resolutionUnsub = null!;
@@ -70,8 +65,6 @@ export class PlaneGridHandler {
 		this.maxIterations = atomWithStorage("maxIterations", 500);
 		this.mode = atomWithStorage("mode", "ts" as Mode);
 		this.store = createStore();
-
-		this.composer = null;
 
 		this.dprQuery = null!;
 		this.canvas = null!;
@@ -88,25 +81,17 @@ export class PlaneGridHandler {
 	public attachToCanvas(canvas: HTMLCanvasElement) {
 		this.canvas = canvas;
 
-		this.tilePainter = new BitmapPainter();
 		this.camera = new Camera(this.plane);
-		this.tileStore = new TileStore({});
-
-		// this.jobQueue = new JobQueue(new TSSupervisor(), this.tileStore, {
-		this.jobQueue = new JobQueue(this.store.get(this.poolSize), this.tileStore);
-
-		this.composer = new Composer(
-			this.plane,
-			this.tileStore,
-			this.jobQueue,
-			this.tilePainter,
+		this.orchestrator = createBitmapOrchestrator(
+			WASMWorker,
+			canvas,
 			this.camera,
-			this.store.get(this.resolution),
-			this.store.get(this.maxIterations),
+			{
+				poolSize: this.store.get(this.poolSize),
+				tileSize: this.store.get(this.resolution),
+				maxIters: this.store.get(this.maxIterations),
+			},
 		);
-
-		this.tilePainter.setCanvas(this.canvas);
-		this.tilePainter.setCamera(this.camera);
 
 		this.poolSizeUnsub = bindAtom(
 			this.store,
@@ -165,77 +150,62 @@ export class PlaneGridHandler {
 		this.maxIterationsUnsub();
 		this.modeUnsub();
 
-		this.composer?.dispose();
-		this.jobQueue?.dispose();
-		this.tileStore?.dispose();
+		this.orchestrator.dispose();
 	}
 
-	public updateMode = () => {
-		this.composer?.dispose();
-		this.jobQueue?.dispose();
-		this.tileStore.clear();
-
-		this.jobQueue = new JobQueue(this.store.get(this.poolSize), this.tileStore);
-
-		this.composer = new Composer(
-			this.plane,
-			this.tileStore,
-			this.jobQueue,
-			this.tilePainter,
-			this.camera,
-			this.store.get(this.resolution),
-			this.store.get(this.maxIterations),
-		);
-	};
+	public updateMode = () => {};
 
 	public getMode = () => {
 		return this.mode;
 	};
 
 	public updatePoolSize = (poolSize: number): void => {
-		if (this.jobQueue !== null) {
-			this.jobQueue.setPoolSize(poolSize);
+		if (this.orchestrator !== null) {
+			this.orchestrator.setPoolSize(poolSize);
 		}
 	};
 
 	private updateResolution = (resolution: number): void => {
-		if (this.composer !== null) {
-			this.composer.setResolution(resolution);
+		if (this.orchestrator !== null) {
+			this.orchestrator.setTileSize(resolution);
 		}
 	};
 
 	private updateMaxIterations = (iterations: number): void => {
-		if (this.composer !== null) {
-			this.composer.setMaxIterations(iterations);
+		if (this.orchestrator !== null) {
+			this.orchestrator.setMaxIterations(iterations);
 		}
 	};
 
 	public getWorkerBusyness(): boolean[] | null {
-		if (this.jobQueue !== null) {
-			return this.jobQueue.getWorkerBusyness();
+		if (this.orchestrator !== null) {
+			return this.orchestrator.getWorkerBusyness();
 		} else {
 			return null;
 		}
 	}
 
 	public getQueueSize(): number | null {
-		if (this.jobQueue !== null) {
-			return this.jobQueue.getQueueSize();
+		if (this.orchestrator !== null) {
+			return this.orchestrator.getQueueSize();
 		} else {
 			return null;
 		}
 	}
 
+	// TOOD this
 	public getRenderTimePerTile(): number | null {
-		if (this.jobQueue !== null) {
+		/* if (this.jobQueue !== null) {
 			return this.jobQueue.getRenderTimePerTile();
 		} else {
 			return null;
-		}
+		} */
+
+		return null;
 	}
 
 	private tick = () => {
-		this.composer?.draw();
+		this.orchestrator?.update();
 		this.rafNumber = requestAnimationFrame(this.tick);
 	};
 

@@ -1,5 +1,5 @@
 import type { TileKey, TileWithKey } from "@mandelbrot/common";
-import type { Bounds, Plane } from "@mandelbrot/common/types";
+import type { Bounds } from "@mandelbrot/common/types";
 
 class ViewCornerTiles implements Bounds {
 	public constructor(
@@ -26,8 +26,8 @@ export class TileSetter {
 	private previousCorners: ViewCornerTiles | null;
 	private resolution: number;
 
-	public constructor(plane: Plane, resolution: number = 256) {
-		this.planeSide = plane.side;
+	public constructor(planeSide: number, resolution: number = 256) {
+		this.planeSide = planeSide;
 		this.resolution = resolution;
 		this.previousCorners = null;
 	}

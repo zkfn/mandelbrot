@@ -8,8 +8,14 @@ type RunningJob<JobAssignment> = {
 
 type WorkerID = number;
 
-export class WorkerPool<JobAssignment, Transfer, Result> {
-	private supervisor: Supervisor<JobAssignment, Transfer, Result>;
+export function determineDefaultPoolSize() {
+	const cores = navigator.hardwareConcurrency || 4;
+	const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+	return Math.max(1, Math.floor((cores - 1) * (isMobile ? 0.5 : 1)));
+}
+
+export class WorkerPool<JobAssignment, Result> {
+	private supervisor: Supervisor<JobAssignment, Result>;
 	private jobQueue: JobAssignment[];
 	private generation: number;
 	private poolSize: number;
@@ -21,7 +27,7 @@ export class WorkerPool<JobAssignment, Transfer, Result> {
 	private disposeFlag: DisposeFlag;
 
 	public constructor(
-		supervisor: Supervisor<JobAssignment, Transfer, Result>,
+		supervisor: Supervisor<JobAssignment, Result>,
 		size: number,
 	) {
 		this.supervisor = supervisor;
@@ -85,6 +91,16 @@ export class WorkerPool<JobAssignment, Transfer, Result> {
 		}
 
 		return busyness;
+	}
+
+	public getRunningJobs() {
+		const assignments: JobAssignment[] = [];
+
+		for (const job of this.runningJobs.values()) {
+			assignments.push(job.assignment);
+		}
+
+		return assignments;
 	}
 
 	public clearQueue(): void {
@@ -201,6 +217,7 @@ export class WorkerPool<JobAssignment, Transfer, Result> {
 			this.registerWorker(workerId, replacement);
 
 			if (generation == this.generation) {
+				this.supervisor.jobFailed(assignment);
 				this.enqueueStart(assignment);
 			}
 		}

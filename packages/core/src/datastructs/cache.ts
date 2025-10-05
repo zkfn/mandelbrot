@@ -37,7 +37,7 @@ export default class Cache<Value> {
 	private itemAges: { [key: string]: number };
 	private rememberedItems: number;
 
-	public constructor(props: Partial<CacheProps>) {
+	public constructor(props: Partial<CacheProps> = {}) {
 		const {
 			maxAge = defaultProps.maxAge,
 			minAge = defaultProps.minAge,

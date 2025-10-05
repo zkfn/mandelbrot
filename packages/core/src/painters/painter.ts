@@ -1,7 +1,6 @@
-import type { WithTileId } from "@mandelbrot/common";
-import type { TileRecord } from "../store";
+import type { TileResult } from "@mandelbrot/common";
 
-export interface Painter<Result extends WithTileId> {
+export interface Painter<Result> {
 	clearCanvas(): void;
-	paintTiles(tiles: TileRecord<Result>[]): void;
+	paintTiles(tiles: TileResult<Result>[]): void;
 }

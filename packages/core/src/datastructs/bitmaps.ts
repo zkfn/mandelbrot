@@ -1,38 +1,16 @@
 import type { TileResult } from "@mandelbrot/common";
 import type { Bounds } from "@mandelbrot/common/types";
+import { BitmapSupervisor } from "@mandelbrot/workers";
 import type { Camera } from "../camera";
-import { type TileRecord, TileState } from "../store";
-import type { Painter } from "./painter";
+import type { Painter } from "../painters";
+import Orchestrator, { type OrchestratorProps } from "./orchestrator";
 
-export type BitmapResult = TileResult<ImageBitmap>;
-
-export class BitmapPainter implements Painter<BitmapResult> {
+export class BitmapPainter implements Painter<ImageBitmap> {
 	private camera: Camera;
 	private canvas: HTMLCanvasElement;
 	private ctx: CanvasRenderingContext2D;
 
-	public constructor() {
-		this.camera = null!;
-		this.canvas = null!;
-		this.ctx = null!;
-	}
-
-	public paintTiles(tiles: TileRecord<BitmapResult>[]): void {
-		this.assertInit();
-
-		for (const record of tiles) {
-			if (record.state == TileState.READY) {
-				const result = record.payload;
-				const bitmap = result.payload;
-				const tileBounds = result.tile.section;
-				const pixelBounds = this.camera.planeBoundsToCamera(tileBounds);
-
-				this.drawBitmap(bitmap, pixelBounds);
-			}
-		}
-	}
-
-	public setCanvas(canvas: HTMLCanvasElement) {
+	public constructor(camera: Camera, canvas: HTMLCanvasElement) {
 		const ctx = canvas.getContext("2d");
 
 		if (!ctx) {
@@ -41,10 +19,19 @@ export class BitmapPainter implements Painter<BitmapResult> {
 
 		this.ctx = ctx;
 		this.canvas = canvas;
+		this.camera = camera;
 	}
 
-	public setCamera(camera: Camera) {
-		this.camera = camera;
+	public paintTiles(tiles: TileResult<ImageBitmap>[]): void {
+		this.assertInit();
+
+		for (const result of tiles) {
+			const bitmap = result.payload;
+			const tileBounds = result.tile.section;
+			const pixelBounds = this.camera.planeBoundsToCamera(tileBounds);
+
+			this.drawBitmap(bitmap, pixelBounds);
+		}
 	}
 
 	public clearCanvas() {
@@ -84,4 +71,21 @@ export class BitmapPainter implements Painter<BitmapResult> {
 			throw new Error("Camera not set inside the painter");
 		}
 	}
+}
+
+export function createBitmapOrchestrator(
+	constr: new () => Worker,
+	canvas: HTMLCanvasElement,
+	camera: Camera,
+	props: Partial<OrchestratorProps> = {},
+): Orchestrator<ImageBitmap, ArrayBufferLike> {
+	const supervisor = new BitmapSupervisor(constr);
+	const painter = new BitmapPainter(camera, canvas);
+
+	return new Orchestrator(supervisor, painter, camera, props, {
+		jobDone: (result, ctx) => {
+			ctx.cache.insert(result.tileId, result);
+			ctx.dirtyFlag.set();
+		},
+	});
 }

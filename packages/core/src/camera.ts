@@ -13,7 +13,8 @@ import {
 import { Viewport } from "./viewport";
 
 export class Camera implements Invalidable {
-	private planeSide: number;
+	public readonly planeSide: number;
+
 	private cameraBounds: Bounds;
 	private DPR: number;
 
