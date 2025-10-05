@@ -5,10 +5,10 @@ import {
 	tileKeyToId,
 } from "@mandelbrot/common";
 import { assertGtZero } from "@mandelbrot/common/asserts";
-import type { Camera } from "../camera";
-import type { Painter } from "../painters";
-import { TileSetter } from "../tile-setter";
 import type Cache from "./cache";
+import type Camera from "./camera";
+import type Painter from "./painter";
+import { TileSetter } from "./tile-setter";
 
 export default class ImageComposer<Paintable> {
 	private painter: Painter<Paintable>;

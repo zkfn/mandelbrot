@@ -12,7 +12,7 @@ import {
 } from "@mandelbrot/common/utils";
 import { Viewport } from "./viewport";
 
-export class Camera implements Invalidable {
+export default class Camera implements Invalidable {
 	public readonly planeSide: number;
 
 	private cameraBounds: Bounds;

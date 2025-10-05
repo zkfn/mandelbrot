@@ -1,9 +1,9 @@
 import type { TileResult } from "@mandelbrot/common";
 import type { Bounds } from "@mandelbrot/common/types";
 import { BitmapSupervisor } from "@mandelbrot/workers";
-import type { Camera } from "../camera";
-import type { Painter } from "../painters";
+import type Camera from "./camera";
 import Orchestrator, { type OrchestratorProps } from "./orchestrator";
+import type Painter from "./painter";
 
 export class BitmapPainter implements Painter<ImageBitmap> {
 	private camera: Camera;

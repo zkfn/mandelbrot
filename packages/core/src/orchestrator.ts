@@ -10,10 +10,10 @@ import {
 	type SubscribableSupervisor,
 	WorkerPool,
 } from "@mandelbrot/workers";
-import type { Camera } from "../camera";
-import type { Painter } from "../painters";
 import Cache from "./cache";
+import type Camera from "./camera";
 import ImageComposer from "./composer";
+import type Painter from "./painter";
 
 export interface OrchestratorContext<Result> {
 	composer: ImageComposer<Result>;

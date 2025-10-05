@@ -1,14 +1,14 @@
 import type { Plane } from "@mandelbrot/common/types";
 import { bindAtom } from "@mandelbrot/common/utils";
-import { Camera } from "@mandelbrot/core";
 import TSWorker from "@mandelbrot/workers/workers/ts_worker.ts?worker";
 import WASMWorker from "@mandelbrot/workers/workers/wasm_zig_worker.ts?worker";
 import type { PrimitiveAtom } from "jotai";
 import { createStore } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import type { Store } from "jotai/vanilla/store";
-import { createBitmapOrchestrator } from "./datastructs/bitmaps";
-import type Orchestrator from "./datastructs/orchestrator";
+import { createBitmapOrchestrator } from "./bitmaps";
+import Camera from "./camera";
+import type Orchestrator from "./orchestrator";
 import { resolutionValues } from "./resolution";
 
 const modesToWorkers = {
