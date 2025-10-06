@@ -22,9 +22,12 @@
 		"prepare": "husky"
 	},
 	"dependencies": {
+		"@tailwindcss/vite": "^4.1.14",
 		"jotai": "^2.14.0",
+		"lucide-react": "^0.544.0",
 		"react": "^19.1.1",
-		"react-dom": "^19.1.1"
+		"react-dom": "^19.1.1",
+		"tailwindcss": "^4.1.14"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.2.5",

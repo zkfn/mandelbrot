@@ -26,30 +26,9 @@ const GridViewer: FC<GridViewerProps> = ({ plane }) => {
 	}, [plane, planeGrid]);
 
 	return (
-		<div
-			style={{
-				display: "grid",
-				gridTemplateColumns: "auto 200px",
-				width: "100%",
-				height: "100%",
-			}}
-		>
-			<div
-				ref={wrapperRef}
-				style={{
-					width: "100%",
-					height: "100%",
-					overflow: "hidden",
-				}}
-			>
-				<canvas
-					ref={canvasRef}
-					style={{
-						width: "100%",
-						height: "100%",
-						display: "block",
-					}}
-				/>
+		<div className="relative h-full w-full">
+			<div ref={wrapperRef} className="w-full h-full overflow-hidden">
+				<canvas ref={canvasRef} className="w-full h-full block" />
 			</div>
 			{ready && (
 				<Provider store={planeGrid.current.store}>
