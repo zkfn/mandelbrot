@@ -120,7 +120,7 @@ const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 				</div>
 				<hr className="text-zinc-200" />
 				<div className="flex items-center gap-3">
-					<label className="w-full tracking-wide">Worker business</label>
+					<label className="w-full tracking-wide">Worker busyness</label>
 					<BusynessDisplay busyness={busyness} />
 				</div>
 				<div className="flex items-center gap-3">
