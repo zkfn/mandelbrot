@@ -22,7 +22,6 @@ export class DisposeFlag {
 	}
 }
 
-// TODO change this into general Notify+observer
 export type Invalidator = () => void;
 
 export class InvalidatorPool {

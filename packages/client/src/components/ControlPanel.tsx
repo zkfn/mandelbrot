@@ -14,10 +14,14 @@ interface ControlPanelProps {
 	planeGrid: Grid;
 }
 
-const MIN_EXPO = 7;
-const MAX_EXPO = 11;
+const MIN_TILE_SIZE_EXP = 7;
+const MAX_TILE_SIZE_EXP = 11;
 
-const tileSizeValues = range(MIN_EXPO, MAX_EXPO).map((e) => 2 ** e);
+const tileSizeValues = range(MIN_TILE_SIZE_EXP, MAX_TILE_SIZE_EXP).map(
+	(e) => 2 ** e,
+);
+
+const maxCores = Math.max(navigator?.hardwareConcurrency || 8, 8);
 
 const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 	const [poolSize, setPoolSize] = useAtom(planeGrid.poolSize);
@@ -70,7 +74,7 @@ const ControlPanel: FC<ControlPanelProps> = ({ planeGrid }) => {
 						className="w-full accent-blue-500"
 						type="range"
 						min={1}
-						max={7}
+						max={maxCores}
 						step={1}
 						value={poolSize}
 						onChange={(e) => setPoolSize(e.currentTarget.valueAsNumber)}
