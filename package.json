@@ -16,8 +16,8 @@
 		"build": "npm run build:zig && npm run build:vite",
 		"check": "tsc -b --noEmit",
 		"lint": "eslint .",
-		"all": "npm run format && npm run lint && npm run check && npm run build",
-		"format": "biome format ./packages/",
+		"all": "biome format ./packages && npm run lint && npm run check && npm run build",
+		"format": "biome format --write ./packages/",
 		"preview": "vite preview --config ./packages/client/vite.config.ts",
 		"prepare": "husky"
 	},
