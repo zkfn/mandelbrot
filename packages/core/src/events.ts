@@ -8,11 +8,11 @@ export class GridEventHandler {
 	private wrapper: HTMLDivElement;
 	private canvas: HTMLCanvasElement;
 
-	private lastPanCoord: [number, number];
-	private isPanning: boolean;
-
 	private dprQuery: MediaQueryList | null;
 	private resizeObserver: ResizeObserver;
+
+	private pointers = new Map<number, { x: number; y: number }>();
+	private lastPinchDist = 0;
 
 	public constructor(
 		camera: Camera,
@@ -22,18 +22,21 @@ export class GridEventHandler {
 		this.camera = camera;
 		this.canvas = canvas;
 		this.wrapper = wrapper;
-
-		this.lastPanCoord = [0, 0];
-		this.isPanning = false;
 		this.dprQuery = null;
 
 		this.resizeObserver = new ResizeObserver(this.updateCanvasDimensions);
 		this.resizeObserver.observe(wrapper);
+		this.canvas.style.touchAction = "none";
+
+		canvas.addEventListener("pointerdown", this.handlePointerDown);
+		canvas.addEventListener("pointermove", this.handlePointerMove, {
+			passive: false,
+		});
+		canvas.addEventListener("pointerup", this.handlePointerUp);
+		canvas.addEventListener("pointercancel", this.handlePointerUp);
+		canvas.addEventListener("lostpointercapture", this.handlePointerUp);
 
 		canvas.addEventListener("wheel", this.handleWheel, { passive: false });
-		canvas.addEventListener("mousedown", this.handleMouseDown);
-		window.addEventListener("mousemove", this.handleMouseMove);
-		window.addEventListener("mouseup", this.handleMouseUp);
 		window.addEventListener("resize", this.updateCanvasDimensions);
 
 		this.updateCanvasDimensions();
@@ -43,12 +46,17 @@ export class GridEventHandler {
 
 	public deattach() {
 		this.canvas.removeEventListener("wheel", this.handleWheel);
-		this.canvas.removeEventListener("mousedown", this.handleMouseDown);
-		window.removeEventListener("mousemove", this.handleMouseMove);
-		window.removeEventListener("mouseup", this.handleMouseUp);
+
+		this.canvas.removeEventListener("pointerdown", this.handlePointerDown);
+		this.canvas.removeEventListener("pointermove", this.handlePointerMove);
+
+		this.canvas.removeEventListener("pointerup", this.handlePointerUp);
+		this.canvas.removeEventListener("pointercancel", this.handlePointerUp);
+		this.canvas.removeEventListener("lostpointercapture", this.handlePointerUp);
+
 		window.removeEventListener("resize", this.updateCanvasDimensions);
 
-		this.resizeObserver.unobserve(this.canvas);
+		this.resizeObserver.unobserve(this.wrapper);
 		this.resizeObserver.disconnect();
 
 		this.unhookFromDPR();
@@ -84,38 +92,75 @@ export class GridEventHandler {
 		this.camera.adaptToCanvas(this.canvas);
 	};
 
-	private handleMouseDown = (event: MouseEvent) => {
+	private handlePointerDown = (event: PointerEvent) => {
+		this.canvas.setPointerCapture(event.pointerId);
 		event.preventDefault();
 
-		this.lastPanCoord = this.camera.clientCoordToCamera(
-			event.clientX,
-			event.clientY,
-		);
+		this.pointers.set(event.pointerId, {
+			x: event.clientX,
+			y: event.clientY,
+		});
 
-		this.setGrabbingPointerStyle();
-		this.isPanning = true;
+		if (this.pointers.size === 1) this.setGrabbingPointerStyle();
+		if (this.pointers.size === 2) {
+			this.lastPinchDist = this.currentPinchDist();
+		}
 	};
 
-	private handleMouseMove = (event: MouseEvent) => {
-		if (!this.isPanning) return;
+	private handlePointerMove = (event: PointerEvent) => {
+		event.preventDefault();
 
-		const [lastX, lastY] = this.lastPanCoord;
-		const [cameraX, cameraY] = this.camera.clientCoordToCamera(
-			event.clientX,
-			event.clientY,
-		);
+		if (!this.pointers.has(event.pointerId)) return;
 
-		this.lastPanCoord = [cameraX, cameraY];
+		if (this.pointers.size === 1) {
+			const prev = this.pointers.get(event.pointerId)!;
 
-		const dx = lastX - cameraX;
-		const dy = lastY - cameraY;
+			this.pointers.set(event.pointerId, {
+				x: event.clientX,
+				y: event.clientY,
+			});
 
-		this.camera.moveViewportByCameraPx(dx, dy);
+			const [x0, y0] = this.camera.clientCoordToCamera(prev.x, prev.y);
+			const [cx, cy] = this.camera.clientCoordToCamera(
+				event.clientX,
+				event.clientY,
+			);
+
+			const dx = x0 - cx;
+			const dy = y0 - cy;
+
+			this.camera.moveViewportByCameraPx(dx, dy);
+			return;
+		}
+
+		if (this.pointers.size === 2) {
+			const dist = this.currentPinchDist();
+
+			if (this.lastPinchDist > 0) {
+				const factor = dist / this.lastPinchDist;
+				const { x: mx, y: my } = this.currentMidpoint();
+				const [mcx, mcy] = this.camera.clientCoordToCamera(mx, my);
+				const upp = this.camera.getUPP() / factor;
+				this.camera.zoomViewportAtCameraPx(upp, mcx, mcy);
+			}
+
+			this.lastPinchDist = dist;
+
+			for (const id of this.pointers.keys()) {
+				if (id === event.pointerId) {
+					this.pointers.set(id, {
+						x: event.clientX,
+						y: event.clientY,
+					});
+				}
+			}
+		}
 	};
 
-	private handleMouseUp = () => {
-		this.setDefaultPointerStyle();
-		this.isPanning = false;
+	private handlePointerUp = (event: PointerEvent) => {
+		this.pointers.delete(event.pointerId);
+		if (this.pointers.size <= 1) this.lastPinchDist = 0;
+		if (this.pointers.size === 0) this.setDefaultPointerStyle();
 	};
 
 	private handleWheel = (event: WheelEvent) => {
@@ -133,6 +178,19 @@ export class GridEventHandler {
 			cameraY,
 		);
 	};
+
+	private currentPinchDist() {
+		const [a, b] = Array.from(this.pointers.values());
+		if (!a || !b) return 0;
+		const dx = a.x - b.x; // FIX: don’t use b.cy
+		const dy = a.y - b.y;
+		return Math.hypot(dx, dy);
+	}
+
+	private currentMidpoint() {
+		const [a, b] = Array.from(this.pointers.values());
+		return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+	}
 
 	private setDefaultPointerStyle() {
 		this.canvas.style.cursor = "crosshair";
