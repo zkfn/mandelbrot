@@ -32,5 +32,13 @@
     "formatter": {
       "enabled": true
     }
+  },
+  "css": {
+    "formatter": {
+      "enabled": true
+    },
+    "linter": {
+      "enabled": true
+    }
   }
 }
