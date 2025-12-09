@@ -16,11 +16,19 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "test:watch": "vitest --watch",
     "type-check": "tsc --noEmit",
     "lint": "biome lint .",
-    "check": "biome check ."
+    "check": "biome check .",
+    "test": "vitest run",
+    "test:ui": "vitest --ui",
+    "bench": "tsx src/bench/index.ts"
   },
   "devDependencies": {
-    "typescript": "~5.9.3"
+    "@vitest/ui": "^4.0.15",
+    "tinybench": "^6.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.0.15"
   }
 }
