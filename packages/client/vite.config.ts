@@ -1,28 +1,6 @@
-import path from "node:path";
-import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-import recompile from "./plugins/vite-plugin-recompile";
+import solid from "vite-plugin-solid";
 
-const relative = (p: string) => path.resolve(__dirname, p);
-
-// https://vite.dev/config/
 export default defineConfig({
-	root: __dirname,
-	base: "/mandelbrot/",
-	build: {
-		outDir: "../../dist",
-		emptyOutDir: true,
-	},
-	plugins: [
-		react(),
-		tailwindcss(),
-		recompile({
-			cmd: "zig",
-			args: ["build"],
-			cwd: relative("../zig/"),
-			watch: ["../zig/src", "../zig/build.zig"].map(relative),
-		}),
-	],
-	cacheDir: "../../node_modules/.vite/",
+  plugins: [solid()],
 });

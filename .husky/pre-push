@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+set -e
+
+echo "🔍 Running pre-push validation..."
+
+# Ensure all files are properly linted and formatted (no auto-fix, just check)
+echo "📝 Checking linting and formatting..."
+pnpm check
+
+# Ensure type checking passes
+echo "🔎 Running type checks..."
+pnpm type-check
+
+echo "✅ Pre-push validation passed!"
+

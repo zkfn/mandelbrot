@@ -1,50 +1,24 @@
 {
-	"name": "mandelbrot",
-	"private": true,
-	"version": "1.0.0",
-	"workspaces": [
-		"packages/*"
-	],
-	"lint-staged": {
-		"*.{ts|tsx}": "biome format --write && eslint"
-	},
-	"type": "module",
-	"scripts": {
-		"dev": "vite --config ./packages/client/vite.config.ts",
-		"build:vite": "vite build --config ./packages/client/vite.config.ts",
-		"build:zig": "npm -w @mandelbrot/zig run build",
-		"build": "npm run build:zig && npm run build:vite",
-		"check": "tsc -b --noEmit",
-		"lint": "eslint .",
-		"all": "biome format ./packages && npm run lint && npm run check && npm run build",
-		"format": "biome format --write ./packages/",
-		"preview": "vite preview --config ./packages/client/vite.config.ts",
-		"prepare": "husky"
-	},
-	"dependencies": {
-		"@tailwindcss/vite": "^4.1.14",
-		"jotai": "^2.14.0",
-		"lucide-react": "^0.544.0",
-		"react": "^19.1.1",
-		"react-dom": "^19.1.1",
-		"tailwindcss": "^4.1.14"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "2.2.5",
-		"@eslint/js": "^9.33.0",
-		"@types/node": "^24.6.2",
-		"@types/react": "^19.1.10",
-		"@types/react-dom": "^19.1.7",
-		"@vitejs/plugin-react": "^5.0.0",
-		"chokidar": "^4.0.3",
-		"eslint": "^9.33.0",
-		"eslint-plugin-react-hooks": "^5.2.0",
-		"eslint-plugin-react-refresh": "^0.4.20",
-		"globals": "^16.3.0",
-		"husky": "^9.1.7",
-		"lint-staged": "^16.2.3",
-		"typescript": "~5.8.3",
-		"typescript-eslint": "^8.39.1",
-		"vite": "^7.1.2"
-	}
+  "name": "mandelbrot",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "preview": "turbo run preview",
+    "prepare": "husky",
+    "lint": "turbo run lint",
+    "lint:fix": "biome lint --write .",
+    "format": "biome format --write .",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "type-check": "turbo run type-check"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.8",
+    "husky": "^9.1.7",
+    "turbo": "^2.6.3"
+  },
+  "packageManager": "pnpm@10.25.0+sha512.5e82639027af37cf832061bcc6d639c219634488e0f2baebe785028a793de7b525ffcd3f7ff574f5e9860654e098fe852ba8ac5dd5cefe1767d23a020a92f501"
 }

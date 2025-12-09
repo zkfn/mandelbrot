@@ -1,14 +1,23 @@
-import GridViewer from "./components/GridViewer";
+import { createSignal } from "solid-js";
+import "./App.css";
 
 function App() {
-	return (
-		<GridViewer
-			plane={{
-				center: [-0.5, 0],
-				side: 4,
-			}}
-		/>
-	);
+  const [count, setCount] = createSignal(0);
+
+  return (
+    <>
+      <h1>Vite + Solid</h1>
+      <div class="card">
+        <button onClick={() => setCount((count) => count + 1)} type="button">
+          count is {count()}
+        </button>
+        <p>
+          Edit <code>src/App.tsx</code> and save to test HMR
+        </p>
+      </div>
+      <p class="read-the-docs">Click on the Vite and Solid logos to learn more</p>
+    </>
+  );
 }
 
 export default App;

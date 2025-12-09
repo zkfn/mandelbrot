@@ -11,9 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
-
-.zig-cache/
-zig-out/
+.turbo/
 
 # Editor directories and files
 .vscode/*
