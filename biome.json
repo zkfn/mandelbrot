@@ -2,7 +2,15 @@
   "$schema": "https://biomejs.dev/schemas/2.3.8/schema.json",
   "files": {
     "ignoreUnknown": false,
-    "includes": ["packages/**/*", "*.json", "!node_modules/**/*", "scripts/**/*", "!dist/**/*"]
+    "includes": [
+      "packages/**/*",
+      "*.json",
+      "scripts/**/*",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/.turbo",
+      "!**/*.tsbuildinfo"
+    ]
   },
   "formatter": {
     "enabled": true,
