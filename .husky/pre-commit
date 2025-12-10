@@ -14,4 +14,8 @@ git add -u
 echo "🔎 Running type checks..."
 pnpm type-check
 
+# Run all tests (this will fail if any test fails)
+echo "🧪 Running tests..."
+pnpm test
+
 echo "✅ Pre-commit checks passed!"
