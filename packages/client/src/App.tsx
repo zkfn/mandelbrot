@@ -1,7 +1,5 @@
-import { helloFromCommon } from "@mandelbrot/common";
-
 function App() {
-  return <div>{helloFromCommon()}</div>;
+  return <div>Hello Mandelbrot</div>;
 }
 
 export default App;

@@ -1,0 +1,23 @@
+{
+  "name": "@mandelbrot/benchmarks",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "bench": "tsx run.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tinybench": "^6.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.3",
+    "web-worker": "^1.5.0"
+  },
+  "dependencies": {
+    "@mandelbrot/common": "workspace:*",
+    "@mandelbrot/workers": "workspace:*"
+  }
+}

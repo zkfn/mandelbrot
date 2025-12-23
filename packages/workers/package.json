@@ -1,5 +1,5 @@
 {
-  "name": "@mandelbrot/common",
+  "name": "@mandelbrot/workers",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,27 +11,19 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
-    },
-    "./worker-protocol": {
-      "development": "./src/worker_protocol.ts",
-      "types": "./dist/worker_protocol.d.ts",
-      "import": "./dist/worker_protocol.js",
-      "default": "./dist/worker_protocol.js"
     }
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test:watch": "vitest --watch",
     "type-check": "tsc --noEmit",
     "lint": "biome lint .",
-    "check": "biome check .",
-    "test": "vitest run",
-    "test:ui": "vitest --ui"
+    "check": "biome check ."
+  },
+  "dependencies": {
+    "@mandelbrot/common": "workspace:*"
   },
   "devDependencies": {
-    "@vitest/ui": "^4.0.15",
-    "typescript": "~5.9.3",
-    "vitest": "^4.0.15"
+    "typescript": "~5.9.3"
   }
 }

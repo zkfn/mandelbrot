@@ -1,9 +1,9 @@
-type CacheConfig = {
+export type CacheConfig = {
   capacity: number;
   minTtl: number;
 };
 
-export default class Cache<TData> {
+export class Cache<TData> {
   private itemCount: number = 0;
   private capacity: number = 0;
   private minTtl: number = 0;

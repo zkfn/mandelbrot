@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.workers.json",
+  "compilerOptions": {
+    "outDir": "../../dist/worker_queue",
+    "rootDir": ".",
+    "noEmit": false,
+    "module": "ESNext",
+    "target": "ES2022",
+    "lib": ["ES2022", "WebWorker"],
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": false
+  },
+  "include": ["src/"],
+  "exclude": ["node_modules"]
+}

@@ -18,6 +18,31 @@ importers:
         specifier: ^2.6.3
         version: 2.6.3
 
+  packages/benchmarks:
+    dependencies:
+      '@mandelbrot/common':
+        specifier: workspace:*
+        version: link:../common
+      '@mandelbrot/workers':
+        specifier: workspace:*
+        version: link:../workers
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.10.2
+      tinybench:
+        specifier: ^6.0.0
+        version: 6.0.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      web-worker:
+        specifier: ^1.5.0
+        version: 1.5.0
+
   packages/client:
     dependencies:
       '@mandelbrot/common':
@@ -54,18 +79,22 @@ importers:
       '@vitest/ui':
         specifier: ^4.0.15
         version: 4.0.15(vitest@4.0.15)
-      tinybench:
-        specifier: ^6.0.0
-        version: 6.0.0
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
       typescript:
         specifier: ~5.9.3
         version: 5.9.3
       vitest:
         specifier: ^4.0.15
         version: 4.0.15(@types/node@24.10.2)(@vitest/ui@4.0.15)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)
+
+  packages/workers:
+    dependencies:
+      '@mandelbrot/common':
+        specifier: workspace:*
+        version: link:../common
+    devDependencies:
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
 
 packages:
 
@@ -1296,6 +1325,9 @@ packages:
       jsdom:
         optional: true
 
+  web-worker@1.5.0:
+    resolution: {integrity: sha512-RiMReJrTAiA+mBjGONMnjVDP2u3p9R1vkcGz6gDIrOMT3oGuYwX2WRMYI9ipkphSuE5XKEhydbhNEJh4NY9mlw==}
+
   why-is-node-running@2.3.0:
     resolution: {integrity: sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w==}
     engines: {node: '>=8'}
@@ -2303,6 +2335,8 @@ snapshots:
       - terser
       - tsx
       - yaml
+
+  web-worker@1.5.0: {}
 
   why-is-node-running@2.3.0:
     dependencies:

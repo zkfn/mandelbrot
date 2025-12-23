@@ -1,5 +1,5 @@
+import { Cache } from "@mandelbrot/common";
 import { Bench } from "tinybench";
-import Cache from "../cache";
 
 const bench = new Bench({ time: 500 });
 
