@@ -17,6 +17,12 @@
       "types": "./dist/worker_protocol.d.ts",
       "import": "./dist/worker_protocol.js",
       "default": "./dist/worker_protocol.js"
+    },
+    "./utils": {
+      "development": "./src/utils/index.ts",
+      "types": "./dist/utils/index.d.ts",
+      "import": "./dist/utils/index.js",
+      "default": "./dist/utils/index.js"
     }
   },
   "scripts": {

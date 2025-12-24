@@ -1,3 +1,4 @@
+import { checkDestroyed, Destroyable } from "../utils/destroyable";
 import type {
   QueueToWorkerMessage,
   WorkerToQueueMessage,
@@ -81,7 +82,7 @@ export class SimpleWorkerWrapper<TData, TResult> implements WorkerWrapper<TData,
   };
 }
 
-export class WorkerQueue<TData, TResult> {
+export class WorkerQueue<TData, TResult> extends Destroyable {
   private poolSize: number = 0;
   private batchSize: number = 0;
   private requeueWhenRemaning: number = 0;
@@ -102,6 +103,7 @@ export class WorkerQueue<TData, TResult> {
     onResult: (jobId: string, result: TResult) => void,
     { poolSize, batchSize: chunkSize, requeueWhenRemaning }: WorkerQueueConfig
   ) {
+    super();
     this.jobQueue = [];
 
     this.jobsToWorkers = new Map();
@@ -117,6 +119,7 @@ export class WorkerQueue<TData, TResult> {
     this.reconfigure({ poolSize, batchSize: chunkSize, requeueWhenRemaning });
   }
 
+  @checkDestroyed
   public reconfigure({ poolSize, batchSize: chunkSize, requeueWhenRemaning }: WorkerQueueConfig) {
     this.poolSize = poolSize;
     this.batchSize = chunkSize;
@@ -145,6 +148,7 @@ export class WorkerQueue<TData, TResult> {
     }
   }
 
+  @checkDestroyed
   public setJobs(jobs: Job<TData>[]) {
     const ids = new Set(jobs.map((job) => job.jobId));
     const toCancel = new Map<WorkerWrapper<TData, TResult>, string[]>();
@@ -173,8 +177,16 @@ export class WorkerQueue<TData, TResult> {
     }
   }
 
+  @checkDestroyed
   public queuedJobs(): number {
     return this.jobQueue.length;
+  }
+
+  public override destroy(): void {
+    this.workerPool.forEach((worker) => {
+      worker.kill();
+    });
+    super.destroy();
   }
 
   private seedJobs() {

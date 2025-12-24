@@ -5,7 +5,8 @@
     "rootDir": "./src",
     "noEmit": false,
     "allowImportingTsExtensions": false,
-    "lib": ["DOM", "ES2022"]
+    "lib": ["DOM", "ES2022"],
+    "experimentalDecorators": true
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "src/**/*.test.ts"]

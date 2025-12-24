@@ -658,4 +658,158 @@ describe("WorkerQueue", () => {
       expect(results.size).toBe(1);
     });
   });
+
+  describe("destroy", () => {
+    it("should mark the queue as destroyed", () => {
+      const queue = new WorkerQueue(MockWorkerFactory, resultCallback, {
+        poolSize: 2,
+        batchSize: 5,
+        requeueWhenRemaning: 1,
+      });
+
+      expect(queue.isDestroyed()).toBe(false);
+      queue.destroy();
+      expect(queue.isDestroyed()).toBe(true);
+    });
+
+    it("should kill all workers when destroyed", async () => {
+      const queue = new WorkerQueue(MockWorkerFactory, resultCallback, {
+        poolSize: 3,
+        batchSize: 5,
+        requeueWhenRemaning: 1,
+      });
+
+      await wait(10);
+      expect(MockWorker.workers.length).toBe(3);
+
+      const initialTerminations = MockWorker.termnations;
+      queue.destroy();
+
+      // All workers should be killed (terminate() called)
+      expect(MockWorker.termnations).toBe(initialTerminations + 3);
+    });
+
+    it("should throw error when calling reconfigure after destroy", () => {
+      const queue = new WorkerQueue(MockWorkerFactory, resultCallback, {
+        poolSize: 2,
+        batchSize: 5,
+        requeueWhenRemaning: 1,
+      });
+
+      queue.destroy();
+
+      expect(() => {
+        queue.reconfigure({
+          poolSize: 3,
+          batchSize: 5,
+          requeueWhenRemaning: 1,
+        });
+      }).toThrow("Cannot call method 'reconfigure' on destroyed object");
+    });
+
+    it("should throw error when calling setJobs after destroy", () => {
+      const queue = new WorkerQueue(MockWorkerFactory, resultCallback, {
+        poolSize: 2,
+        batchSize: 5,
+        requeueWhenRemaning: 1,
+      });
+
+      queue.destroy();
+
+      expect(() => {
+        queue.setJobs([{ jobId: "job1", data: 10 }]);
+      }).toThrow("Cannot call method 'setJobs' on destroyed object");
+    });
+
+    it("should throw error when calling queuedJobs after destroy", () => {
+      const queue = new WorkerQueue(MockWorkerFactory, resultCallback, {
+        poolSize: 2,
+        batchSize: 5,
+        requeueWhenRemaning: 1,
+      });
+
+      queue.destroy();
+
+      expect(() => {
+        queue.queuedJobs();
+      }).toThrow("Cannot call method 'queuedJobs' on destroyed object");
+    });
+
+    it("should allow destroy to be called multiple times without error", () => {
+      const queue = new WorkerQueue(MockWorkerFactory, resultCallback, {
+        poolSize: 2,
+        batchSize: 5,
+        requeueWhenRemaning: 1,
+      });
+
+      queue.destroy();
+      expect(queue.isDestroyed()).toBe(true);
+
+      // Should not throw when called again
+      expect(() => {
+        queue.destroy();
+      }).not.toThrow();
+
+      expect(queue.isDestroyed()).toBe(true);
+    });
+
+    it("should prevent operations after destroy even if jobs were previously set", async () => {
+      const queue = new WorkerQueue(MockWorkerFactory, resultCallback, {
+        poolSize: 1,
+        batchSize: 1,
+        requeueWhenRemaning: 0,
+      });
+
+      await wait(10);
+
+      queue.setJobs([
+        { jobId: "job1", data: 10 },
+        { jobId: "job2", data: 20 },
+      ]);
+
+      await wait(10);
+
+      queue.destroy();
+
+      // All operations should fail after destroy
+      expect(() => {
+        queue.reconfigure({
+          poolSize: 2,
+          batchSize: 1,
+          requeueWhenRemaning: 0,
+        });
+      }).toThrow("Cannot call method 'reconfigure' on destroyed object");
+
+      expect(() => {
+        queue.setJobs([{ jobId: "job3", data: 30 }]);
+      }).toThrow("Cannot call method 'setJobs' on destroyed object");
+
+      expect(() => {
+        queue.queuedJobs();
+      }).toThrow("Cannot call method 'queuedJobs' on destroyed object");
+    });
+
+    it("should kill workers even if they have pending jobs", async () => {
+      const queue = new WorkerQueue(MockWorkerFactory, resultCallback, {
+        poolSize: 2,
+        batchSize: 1,
+        requeueWhenRemaning: 0,
+      });
+
+      await wait(10);
+
+      queue.setJobs([
+        { jobId: "job1", data: 100 }, // Long sleep
+        { jobId: "job2", data: 100 }, // Long sleep
+      ]);
+
+      await wait(10);
+
+      const initialTerminations = MockWorker.termnations;
+      queue.destroy();
+
+      // All workers should be killed immediately
+      expect(MockWorker.termnations).toBe(initialTerminations + 2);
+    });
+  });
 });
