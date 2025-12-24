@@ -16,10 +16,11 @@ export type WorkerQueueConfig = {
 };
 
 export interface WorkerWrapper<TData, TResult> {
+  readonly id: number;
   cancel(jobIds: string[]): void;
-  cancelAll(): void;
   assignJobs(generation: number, jobs: { jobId: string; data: TData }[]): void;
-  invalidate(): void;
+  terminate(): void;
+  kill(): void;
   setCallback(
     callback: (
       worker: WorkerWrapper<TData, TResult>,
@@ -28,15 +29,19 @@ export interface WorkerWrapper<TData, TResult> {
   ): void;
 }
 
+export type WorkerFactory<TData, TResult> = (id: number) => WorkerWrapper<TData, TResult>;
+
 export class SimpleWorkerWrapper<TData, TResult> implements WorkerWrapper<TData, TResult> {
+  public readonly id: number;
   protected worker: WorkerWithProtocol<TData, TResult>;
 
   static asFactory = <TData, TResult>(workerGetter: () => WorkerWithProtocol<TData, TResult>) => {
-    return () => new SimpleWorkerWrapper<TData, TResult>(workerGetter());
+    return (id: number) => new SimpleWorkerWrapper<TData, TResult>(id, workerGetter());
   };
 
-  public constructor(worker: WorkerWithProtocol<TData, TResult>) {
+  public constructor(id: number, worker: WorkerWithProtocol<TData, TResult>) {
     this.worker = worker;
+    this.id = id;
   }
 
   public cancel = (jobIds: string[]) => {
@@ -46,9 +51,9 @@ export class SimpleWorkerWrapper<TData, TResult> implements WorkerWrapper<TData,
     } satisfies QueueToWorkerMessage<TData>);
   };
 
-  public cancelAll = () => {
+  public terminate = () => {
     this.worker.postMessage({
-      kind: "cancel-all",
+      kind: "terminate",
     } satisfies QueueToWorkerMessage<TData>);
   };
 
@@ -60,7 +65,7 @@ export class SimpleWorkerWrapper<TData, TResult> implements WorkerWrapper<TData,
     } satisfies QueueToWorkerMessage<TData>);
   };
 
-  public invalidate = () => {
+  public kill = () => {
     this.worker.terminate();
   };
 
@@ -83,20 +88,26 @@ export class WorkerQueue<TData, TResult> {
   private generationCounter: number = 0;
 
   private jobQueue: Job<TData>[];
-  private jobs: Map<string, WorkerWrapper<TData, TResult>>;
-  private workers: Map<number, WorkerWrapper<TData, TResult>>;
+  private assignedJobs: Map<string, Job<TData>>;
+  private jobsToWorkers: Map<string, WorkerWrapper<TData, TResult>>;
+
+  private workerPool: Map<number, WorkerWrapper<TData, TResult>>;
   private workerQueue: WorkerWrapper<TData, TResult>[];
+
   private onResult: (jobId: string, result: TResult) => void;
-  private workerFactory: () => WorkerWrapper<TData, TResult>;
+  private workerFactory: WorkerFactory<TData, TResult>;
 
   public constructor(
-    workerFactory: () => WorkerWrapper<TData, TResult>,
+    workerFactory: WorkerFactory<TData, TResult>,
     onResult: (jobId: string, result: TResult) => void,
     { poolSize, batchSize: chunkSize, requeueWhenRemaning }: WorkerQueueConfig
   ) {
     this.jobQueue = [];
-    this.jobs = new Map();
-    this.workers = new Map();
+
+    this.jobsToWorkers = new Map();
+    this.assignedJobs = new Map();
+
+    this.workerPool = new Map();
     this.workerQueue = [];
     this.generationCounter = 0;
 
@@ -123,12 +134,12 @@ export class WorkerQueue<TData, TResult> {
       throw new Error("requeueWhenRemaning must be at least 0");
     }
 
-    if (this.workers.size < this.poolSize) {
-      for (let i = this.workers.size; i < this.poolSize; i++) {
-        this.registerWorker();
+    if (this.workerPool.size < this.poolSize) {
+      for (let i = this.workerPool.size; i < this.poolSize; i++) {
+        this.registerWorker(i);
       }
-    } else if (this.workers.size > this.poolSize) {
-      for (let i = this.workers.size; i > this.poolSize; i--) {
+    } else if (this.workerPool.size > this.poolSize) {
+      for (let i = this.workerPool.size - 1; i >= this.poolSize; i--) {
         this.fireWorker(i);
       }
     }
@@ -138,7 +149,7 @@ export class WorkerQueue<TData, TResult> {
     const ids = new Set(jobs.map((job) => job.jobId));
     const toCancel = new Map<WorkerWrapper<TData, TResult>, string[]>();
 
-    for (const [jobId, worker] of this.jobs) {
+    for (const [jobId, worker] of this.jobsToWorkers) {
       if (!ids.has(jobId)) {
         let destination = toCancel.get(worker);
 
@@ -157,10 +168,13 @@ export class WorkerQueue<TData, TResult> {
       worker.cancel(jobIds);
     });
 
-    // Seed jobs if there are workers available
     if (this.workerQueue.length > 0 && this.jobQueue.length > 0) {
       this.seedJobs();
     }
+  }
+
+  public queuedJobs(): number {
+    return this.jobQueue.length;
   }
 
   private seedJobs() {
@@ -173,9 +187,13 @@ export class WorkerQueue<TData, TResult> {
       const batch = this.jobQueue.splice(0, this.batchSize);
       const assignments = batch.map((job) => ({ jobId: job.jobId, data: job.data }));
 
-      for (const assignment of assignments) {
-        this.jobs.set(assignment.jobId, worker);
-      }
+      batch.forEach((job) => {
+        this.assignedJobs.set(job.jobId, job);
+      });
+
+      assignments.forEach((assignment) => {
+        this.jobsToWorkers.set(assignment.jobId, worker);
+      });
 
       worker.assignJobs(this.generationCounter, assignments);
     }
@@ -185,50 +203,73 @@ export class WorkerQueue<TData, TResult> {
     worker: WorkerWrapper<TData, TResult>,
     message: WorkerToQueueMessage<TResult>
   ) => {
+    if (message.kind === "terminated") {
+      this.redoJobs(message.jobIds);
+
+      if (!message.finishingComputation) {
+        this.workerPool.delete(worker.id);
+      }
+
+      return;
+    }
+
     if (message.kind === "result") {
-      const job = this.jobs.get(message.jobId);
+      const job = this.jobsToWorkers.get(message.jobId);
 
       if (job) {
-        this.jobs.delete(message.jobId);
+        this.jobsToWorkers.delete(message.jobId);
 
         if (message.generation === this.generationCounter) {
           this.onResult(message.jobId, message.data);
         }
       }
-
-      if (message.remainingJobs <= this.requeueWhenRemaning) {
-        this.workerQueue.push(worker);
-        this.seedJobs();
-      }
     } else if (message.kind === "cancelled") {
       for (const jobId of message.jobIds) {
-        this.jobs.delete(jobId);
-      }
-      if (message.remainingJobs <= this.requeueWhenRemaning) {
-        this.workerQueue.push(worker);
-        this.seedJobs();
+        this.jobsToWorkers.delete(jobId);
       }
     } else {
       throw new Error(`Unknown message kind: ${message}`);
     }
+
+    if (worker.id >= this.poolSize) {
+      if (message.remainingJobs === 0) {
+        this.workerPool.delete(worker.id);
+      }
+    } else if (message.remainingJobs <= this.requeueWhenRemaning) {
+      this.workerQueue.push(worker);
+      this.seedJobs();
+    }
   };
 
-  private registerWorker() {
-    const worker = this.workerFactory();
-    const workerId = this.workers.size;
+  private redoJobs(jobIds: string[]) {
+    jobIds.forEach((jobId) => {
+      const known = this.assignedJobs.get(jobId);
 
+      if (known) {
+        this.jobsToWorkers.delete(jobId);
+        this.jobQueue.unshift(known);
+      }
+    });
+  }
+
+  private registerWorker(workerId: number) {
+    if (this.workerPool.has(workerId)) {
+      return;
+    }
+
+    const worker = this.workerFactory(workerId);
     worker.setCallback(this.onMessage);
-    this.workers.set(workerId, worker);
+
+    this.workerPool.set(workerId, worker);
     this.workerQueue.push(worker);
   }
 
   private fireWorker(workerId: number) {
-    const worker = this.workers.get(workerId);
+    const worker = this.workerPool.get(workerId);
 
     if (worker) {
-      worker.invalidate();
-      this.workers.delete(workerId);
       this.workerQueue.splice(this.workerQueue.indexOf(worker), 1);
+      worker.terminate();
     }
   }
 }

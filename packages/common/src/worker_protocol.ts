@@ -10,7 +10,9 @@ export type WorkerWithProtocol<TData, TResult> = WorkerInterface<
 >;
 
 export type JobPayload<TData> = { jobId: string; data: TData };
-export type JobPayloadWithGeneration<TData> = JobPayload<TData> & { generation: number };
+export type JobPayloadWithGeneration<TData> = JobPayload<TData> & {
+  generation: number;
+};
 
 export type ResultMessage<TResult> = {
   kind: "result";
@@ -20,11 +22,24 @@ export type ResultMessage<TResult> = {
   data: TResult;
 };
 
-export type CancelledMessage = { kind: "cancelled"; jobIds: string[]; remainingJobs: number };
+export type CancelledMessage = {
+  kind: "cancelled";
+  jobIds: string[];
+  remainingJobs: number;
+};
 
-export type WorkerToQueueMessage<TResult> = ResultMessage<TResult> | CancelledMessage;
+export type TerminatedMessage = {
+  kind: "terminated";
+  jobIds: string[];
+  finishingComputation: boolean;
+};
+
+export type WorkerToQueueMessage<TResult> =
+  | ResultMessage<TResult>
+  | CancelledMessage
+  | TerminatedMessage;
 
 export type QueueToWorkerMessage<TData> =
   | { kind: "assign"; generation: number; jobs: JobPayload<TData>[] }
   | { kind: "cancel"; jobIds: string[] }
-  | { kind: "cancel-all" };
+  | { kind: "terminate" };

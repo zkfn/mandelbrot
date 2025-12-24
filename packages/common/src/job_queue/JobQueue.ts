@@ -1,4 +1,9 @@
-import type { CancelledMessage, JobPayloadWithGeneration, ResultMessage } from "../worker_protocol";
+import type {
+  CancelledMessage,
+  JobPayloadWithGeneration,
+  ResultMessage,
+  TerminatedMessage,
+} from "../worker_protocol";
 
 type Runner<TData, TResult> = (data: TData) => Promise<TResult>;
 type Callback<TResult> = (result: ResultMessage<TResult>) => void;
@@ -93,14 +98,14 @@ export class JobQueue<TData, TResult> {
     };
   }
 
-  public cancelAll(): CancelledMessage {
+  public terminate(): TerminatedMessage {
     const jobIds = this.jobs.map((job) => job.jobId);
     this.jobs.length = 0;
 
     return {
-      kind: "cancelled",
+      kind: "terminated",
       jobIds,
-      remainingJobs: this.waiting ? 0 : 1,
+      finishingComputation: !this.waiting,
     };
   }
 }

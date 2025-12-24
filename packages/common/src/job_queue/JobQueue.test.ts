@@ -312,7 +312,7 @@ describe("JobQueue", () => {
     });
   });
 
-  describe("cancelAll", () => {
+  describe("terminate", () => {
     it("should cancel all queued jobs", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
@@ -324,7 +324,7 @@ describe("JobQueue", () => {
 
       // Wait a bit to ensure job1 has started
       await wait(10);
-      queue.cancelAll();
+      queue.terminate();
 
       await wait(50);
 
@@ -346,7 +346,7 @@ describe("JobQueue", () => {
       // Wait for job1 to start
       await wait(10);
 
-      queue.cancelAll();
+      queue.terminate();
 
       await wait(100);
 
@@ -368,17 +368,17 @@ describe("JobQueue", () => {
       // Wait a bit to ensure job1 has started (it's no longer in the queue)
       await wait(10);
 
-      const cancelledMessage = queue.cancelAll();
+      const cancelledMessage = queue.terminate();
 
       // Only queued jobs (job2 and job3) are cancelled, job1 is running
       expect(cancelledMessage).toEqual({
-        kind: "cancelled",
+        kind: "terminated",
         jobIds: ["job2", "job3"],
-        remainingJobs: 1, // job1 is running
+        finishingComputation: true,
       });
     });
 
-    it("should return remainingJobs 0 when cancelling all while waiting", async () => {
+    it("should return finishingComputation false when terminating while waiting", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
       await wait(10);
@@ -389,12 +389,12 @@ describe("JobQueue", () => {
       await wait(30);
 
       // Now queue should be waiting
-      const cancelledMessage = queue.cancelAll();
+      const cancelledMessage = queue.terminate();
 
       expect(cancelledMessage).toEqual({
-        kind: "cancelled",
+        kind: "terminated",
         jobIds: [],
-        remainingJobs: 0,
+        finishingComputation: false,
       });
     });
   });
