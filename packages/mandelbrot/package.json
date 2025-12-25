@@ -1,0 +1,41 @@
+{
+  "name": "@mandelbrot/mandelbrot",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "build": "pnpm build:vite && pnpm build:types",
+    "build:vite": "vite build",
+    "build:types": "tsc -b --emitDeclarationOnly",
+    "type-check": "tsc -b --noEmit",
+    "dev": "tsc -b --emitDeclarationOnly --watch",
+    "clean": "rimraf dist/",
+    "clean:full": "rimraf dist/ node_modules/ .turbo/ *.tsbuildinfo"
+  },
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.cjs"
+    }
+  },
+  "dependencies": {
+    "@mandelbrot/common": "workspace:*",
+    "@mandelbrot/workers": "workspace:*"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.9.10"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "solid-js": "^1.9.10",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.7",
+    "vite-plugin-solid": "^2.11.10"
+  }
+}

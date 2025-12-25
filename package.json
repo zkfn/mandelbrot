@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "turbo run dev test:watch",
-    "build": "turbo run build",
+    "build": "pnpm clean && turbo run build",
+    "build:types": "turbo run build:types",
     "preview": "turbo run preview",
     "prepare": "husky",
     "lint": "turbo run lint",
@@ -16,11 +17,14 @@
     "type-check": "turbo run type-check",
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",
-    "bench": "turbo run bench"
+    "bench": "turbo run bench",
+    "clean": "turbo run clean && rimraf dist/",
+    "clean:full": "turbo run clean:full && rimraf .turbo/ dist/ node_modules/"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.8",
     "husky": "^9.1.7",
+    "rimraf": "^6.1.2",
     "turbo": "^2.6.3"
   },
   "packageManager": "pnpm@10.26.2+sha512.0e308ff2005fc7410366f154f625f6631ab2b16b1d2e70238444dd6ae9d630a8482d92a451144debc492416896ed16f7b114a86ec68b8404b2443869e68ffda6"

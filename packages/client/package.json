@@ -5,15 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build:types": "tsc -b",
+    "build": "pnpm build:types && vite build",
     "preview": "vite preview",
     "deploy": "vite build",
     "lint": "biome lint .",
     "check": "biome check .",
-    "type-check": "tsc -b --noEmit"
+    "type-check": "tsc -b --noEmit",
+    "clean": "rimraf dist/",
+    "clean:full": "rimraf dist/ node_modules/ .turbo/ *.tsbuildinfo"
   },
   "dependencies": {
     "@mandelbrot/common": "workspace:*",
+    "@mandelbrot/mandelbrot": "workspace:*",
     "solid-js": "^1.9.10"
   },
   "devDependencies": {

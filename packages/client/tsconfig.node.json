@@ -1,11 +1,13 @@
 {
-  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "target": "ES2023",
     "lib": ["ES2023"],
     "types": ["node"],
-    "erasableSyntaxOnly": true
+    "moduleResolution": "bundler",
+    "erasableSyntaxOnly": true,
+    "noEmit": true,
+    "composite": true
   },
   "include": ["vite.config.ts"]
 }

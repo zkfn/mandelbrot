@@ -13,19 +13,23 @@
     }
   },
   "scripts": {
-    "build:vite": "tsc && tsx build-workers.ts",
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "type-check": "tsc --noEmit",
     "lint": "biome lint .",
-    "check": "biome check ."
+    "check": "biome check .",
+    "type-check": "tsc -b --noEmit",
+    "build:vite": "tsx build-workers.ts",
+    "build:types": "tsc -b --emitDeclarationOnly",
+    "build": "pnpm build:vite && pnpm build:types",
+    "prepare:dev": "pnpm build",
+    "prepare:bench": "pnpm build",
+    "clean": "rimraf dist/",
+    "clean:full": "rimraf dist/ node_modules/ .turbo/ *.tsbuildinfo"
   },
   "dependencies": {
     "@mandelbrot/common": "workspace:*"
   },
   "devDependencies": {
     "typescript": "~5.9.3",
-    "tsx": "^4.21.0",
-    "vite": "^7.2.4"
+    "vite": "^7.3.0",
+    "tsx": "^4.21.0"
   }
 }

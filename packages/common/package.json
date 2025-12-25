@@ -14,9 +14,7 @@
     },
     "./worker-protocol": {
       "development": "./src/worker_protocol.ts",
-      "types": "./dist/worker_protocol.d.ts",
-      "import": "./dist/worker_protocol.js",
-      "default": "./dist/worker_protocol.js"
+      "types": "./dist/worker_protocol.d.ts"
     },
     "./utils": {
       "development": "./src/utils/index.ts",
@@ -26,14 +24,18 @@
     }
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build:types": "tsc -b --emitDeclarationOnly",
+    "build": "pnpm build:types",
+    "dev": "tsc -b --emitDeclarationOnly --watch",
+    "type-check": "tsc -b --noEmit",
     "test:watch": "vitest --watch",
-    "type-check": "tsc --noEmit",
+    "prepare:bench": "tsc -b",
     "lint": "biome lint .",
     "check": "biome check .",
     "test": "vitest run",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "clean": "rimraf dist/",
+    "clean:full": "rimraf dist/ node_modules/ .turbo/ *.tsbuildinfo"
   },
   "devDependencies": {
     "@vitest/ui": "^4.0.15",

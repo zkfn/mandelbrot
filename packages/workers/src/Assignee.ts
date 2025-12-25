@@ -1,4 +1,4 @@
-import { JobQueue } from "@mandelbrot/common/";
+import { JobQueue } from "@mandelbrot/common";
 import type { QueueToWorkerMessage, ResultMessage } from "@mandelbrot/common/worker-protocol";
 
 export class Assignee<TData, TResult> {

@@ -4,19 +4,28 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**"]
     },
     "dev": {
+      "dependsOn": ["^prepare:dev"],
       "cache": false,
       "persistent": true
     },
-    "bench": {
-      "dependsOn": ["^build", "^build:vite"],
-      "outputs": []
+    "prepare:dev": {
+      "dependsOn": ["^prepare:dev"],
+      "cache": false
     },
-    "build:vite": {
-      "dependsOn": ["^build:vite"],
-      "outputs": []
+    "build:types": {
+      "dependsOn": ["^build:types"],
+      "outputs": ["dist/**/*.d.ts"]
+    },
+    "bench": {
+      "dependsOn": ["^prepare:bench"],
+      "cache": false
+    },
+    "prepare:bench": {
+      "dependsOn": ["^prepare:bench"],
+      "cache": false
     },
     "lint": {
       "dependsOn": ["^lint"],
@@ -30,23 +39,22 @@
       "dependsOn": ["^check"],
       "outputs": []
     },
-    "test": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
     "test:watch": {
       "cache": false,
       "persistent": true,
       "outputs": []
     },
-    "preview": {
-      "dependsOn": ["^build"],
-      "cache": false,
-      "persistent": true
+    "test": {
+      "dependsOn": ["^build", "^test"],
+      "cache": false
     },
-    "deploy": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+    "clean:full": {
+      "dependsOn": ["^clean:full"],
+      "cache": false
+    },
+    "clean": {
+      "dependsOn": ["^clean"],
+      "cache": false
     }
   }
 }

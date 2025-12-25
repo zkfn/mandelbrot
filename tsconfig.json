@@ -7,11 +7,6 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
 
-    /* Bundler mode */
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
-
     /* Type Checking */
     "strict": true,
     "noImplicitAny": false,
@@ -29,7 +24,6 @@
     "noUncheckedSideEffectImports": true,
 
     /* Emit */
-    "noEmit": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -43,6 +37,6 @@
     /* Completeness */
     "skipLibCheck": true,
     "useDefineForClassFields": true,
-    "composite": true
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildinfo"
   }
 }

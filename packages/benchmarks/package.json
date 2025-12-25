@@ -7,7 +7,8 @@
     "type-check": "tsc --noEmit",
     "lint": "biome lint .",
     "check": "biome check .",
-    "bench": "tsx run.ts"
+    "bench": "tsx run.ts",
+    "clean:full": "rimraf node_modules/ .turbo/"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
