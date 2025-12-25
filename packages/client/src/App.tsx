@@ -1,5 +1,7 @@
+import MandelbrotView from "./components/MandelbrotView";
+
 function App() {
-  return <div>Hello Mandelbrot</div>;
+  return <MandelbrotView class="w-full h-full" />;
 }
 
 export default App;
