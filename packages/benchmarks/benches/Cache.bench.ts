@@ -273,6 +273,8 @@ bench.add("get - 50k cache misses", () => {
   }
 });
 
-await bench.run();
+export async function runCacheBench(): Promise<void> {
+  await bench.run();
 
-console.table(bench.table());
+  console.table(bench.table());
+}

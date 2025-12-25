@@ -1,15 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { JobQueue } from "../job_queue/JobQueue";
+import { sleep } from "../utils";
 import type {
   QueueToWorkerMessage,
   WorkerToQueueMessage,
   WorkerWithProtocol,
 } from "../worker_protocol";
 import { SimpleWorkerWrapper, WorkerQueue } from "./WorkerQueue";
-
-const wait = async (millis: number) => {
-  await new Promise((resolve) => setTimeout(resolve, millis));
-};
 
 class MockWorker implements WorkerWithProtocol<number, number> {
   public onmessage: ((event: MessageEvent<WorkerToQueueMessage<number>>) => void) | null = null;
@@ -42,7 +39,7 @@ class MockWorker implements WorkerWithProtocol<number, number> {
   constructor() {
     this.jobQueue = new JobQueue(
       async (value) => {
-        await wait(value);
+        await sleep(value);
         return value;
       },
       (result) => {
@@ -169,7 +166,7 @@ describe("WorkerQueue", () => {
       ]);
 
       // Wait a bit for async operations
-      await wait(10);
+      await sleep(10);
 
       const sentMessages = MockWorker.messages;
       expect(sentMessages.length).toBeGreaterThan(0);
@@ -190,12 +187,12 @@ describe("WorkerQueue", () => {
       });
 
       // Wait a bit for worker to be ready
-      await wait(10);
+      await sleep(10);
 
       queue.setJobs([{ jobId: "job1", data: 42 }]);
 
       // Wait for job to complete (42ms sleep + buffer)
-      await wait(60);
+      await sleep(60);
 
       expect(resultCallback).toHaveBeenCalledWith("job1", 42);
       expect(results.get("job1")).toBe(42);
@@ -214,12 +211,12 @@ describe("WorkerQueue", () => {
       ]);
 
       // Wait a bit for job1 to be assigned (but not complete)
-      await wait(10);
+      await sleep(10);
 
       // Remove job1 from the queue
       queue.setJobs([{ jobId: "job2", data: 20 }]);
 
-      await wait(10);
+      await sleep(10);
 
       const sentMessages = MockWorker.messages;
       const cancelMessage = sentMessages.find((m) => m.kind === "cancel");
@@ -258,7 +255,7 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(10);
+      await sleep(10);
       expect(MockWorker.workers.length).toBe(3);
 
       queue.reconfigure({
@@ -267,7 +264,7 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(20);
+      await sleep(20);
 
       // Workers with id >= 1 should receive terminate messages
       const terminateMessages = MockWorker.messages.filter((m) => m.kind === "terminate");
@@ -282,7 +279,7 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(10);
+      await sleep(10);
 
       // Assign jobs to both workers
       queue.setJobs([
@@ -294,7 +291,7 @@ describe("WorkerQueue", () => {
         { jobId: "job6", data: 100 },
       ]);
 
-      await wait(10);
+      await sleep(10);
 
       // Get initial assign message count
       const initialAssignCount = MockWorker.messages.filter((m) => m.kind === "assign").length;
@@ -310,12 +307,12 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(10);
+      await sleep(10);
 
       const terminateMessages = MockWorker.messages.filter((m) => m.kind === "terminate");
       expect(terminateMessages.length).toBe(1);
 
-      await wait(10);
+      await sleep(10);
 
       // Two assigned to worker 0, one finished by worker 1, one returned to the queue
       expect(queue.queuedJobs()).toBe(3);
@@ -328,14 +325,14 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(10);
+      await sleep(10);
 
       // Assign a job to worker 1 that will complete quickly
       queue.setJobs([
         { jobId: "job1", data: 10 }, // Short sleep - assigned to worker 0 or 1
       ]);
 
-      await wait(10);
+      await sleep(10);
 
       // Reduce pool size while job is running
       // The worker processing the job should be terminated, but should finish the job
@@ -346,7 +343,7 @@ describe("WorkerQueue", () => {
       });
 
       // Wait for job to complete (10ms sleep + buffer)
-      await wait(30);
+      await sleep(30);
 
       // The job should complete even though the worker was terminated
       // This verifies that terminated workers finish their current computation
@@ -361,7 +358,7 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(10);
+      await sleep(10);
       const initialWorkers = [...MockWorker.workers];
       expect(initialWorkers.length).toBe(2);
 
@@ -385,12 +382,12 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(10);
+      await sleep(10);
 
       const terminateMessages = MockWorker.messages.filter((m) => m.kind === "terminate");
 
       expect(terminateMessages.length).toBe(1);
-      await wait(10);
+      await sleep(10);
 
       // Increase pool size back
       queue.reconfigure({
@@ -399,7 +396,7 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(100);
+      await sleep(100);
 
       expect(MockWorker.workers.length).toBe(2);
       expect(results.size).toBe(10);
@@ -412,7 +409,7 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(10);
+      await sleep(10);
       const initialWorkers = [...MockWorker.workers];
       expect(initialWorkers.length).toBe(2);
 
@@ -436,13 +433,13 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(10);
+      await sleep(10);
 
       const terminateMessages = MockWorker.messages.filter((m) => m.kind === "terminate");
 
       expect(terminateMessages.length).toBe(1);
 
-      await wait(40);
+      await sleep(40);
 
       // Increase pool size back
       queue.reconfigure({
@@ -451,7 +448,7 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(100);
+      await sleep(100);
 
       expect(MockWorker.workers.length).toBe(3);
       expect(results.size).toBe(10);
@@ -464,7 +461,7 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(10);
+      await sleep(10);
 
       // Concurrently resize and set jobs
       queue.reconfigure({
@@ -478,7 +475,7 @@ describe("WorkerQueue", () => {
         { jobId: "job2", data: 10 },
       ]);
 
-      await wait(50);
+      await sleep(50);
 
       // All jobs should complete
       expect(resultCallback).toHaveBeenCalledTimes(2);
@@ -493,7 +490,7 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(10);
+      await sleep(10);
 
       // Rapid resize operations
       queue.reconfigure({
@@ -502,7 +499,7 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(5);
+      await sleep(5);
 
       queue.reconfigure({
         poolSize: 2,
@@ -510,7 +507,7 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(5);
+      await sleep(5);
 
       queue.reconfigure({
         poolSize: 1,
@@ -518,7 +515,7 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(10);
+      await sleep(10);
 
       // Should not throw and should have correct number of workers
       expect(MockWorker.workers.length).toBeGreaterThanOrEqual(1);
@@ -541,7 +538,7 @@ describe("WorkerQueue", () => {
         { jobId: "job5", data: 5 },
       ]);
 
-      await wait(10);
+      await sleep(10);
 
       expect(MockWorker.messages).toHaveLength(2);
     });
@@ -556,7 +553,7 @@ describe("WorkerQueue", () => {
       });
 
       // Wait a bit for worker to be ready
-      await wait(10);
+      await sleep(10);
 
       queue.setJobs([
         { jobId: "job1", data: 10 }, // Sleep for 10ms
@@ -564,7 +561,7 @@ describe("WorkerQueue", () => {
       ]);
 
       // Wait for jobs to complete (10ms + 20ms + some buffer)
-      await wait(50);
+      await sleep(50);
 
       expect(resultCallback).toHaveBeenCalledTimes(2);
       expect(results.get("job1")).toBe(10);
@@ -579,7 +576,7 @@ describe("WorkerQueue", () => {
       });
 
       // Wait a bit for workers to be ready
-      await wait(10);
+      await sleep(10);
 
       queue.setJobs([
         { jobId: "job1", data: 30 },
@@ -589,7 +586,7 @@ describe("WorkerQueue", () => {
       ]);
 
       // With 2 workers, jobs should complete faster than sequential
-      await wait(100);
+      await sleep(100);
 
       expect(resultCallback).toHaveBeenCalledTimes(4);
       expect(results.get("job1")).toBe(30);
@@ -608,7 +605,7 @@ describe("WorkerQueue", () => {
       });
 
       // Wait a bit for worker to be ready
-      await wait(10);
+      await sleep(10);
 
       queue.setJobs([
         { jobId: "job1", data: 50 }, // Long sleep
@@ -617,13 +614,13 @@ describe("WorkerQueue", () => {
       ]);
 
       // Wait a bit for job1 to be assigned (but not complete)
-      await wait(10);
+      await sleep(10);
 
       // Remove job2 from the queue (should cancel it)
       queue.setJobs([{ jobId: "job3", data: 1 }]);
 
       // Wait for job1 to complete
-      await wait(60);
+      await sleep(60);
 
       expect(results.has("job1")).toBe(true);
       expect(results.has("job2")).toBe(false);
@@ -644,13 +641,13 @@ describe("WorkerQueue", () => {
       ]);
 
       // Wait a bit for jobs to be assigned
-      await wait(10);
+      await sleep(10);
 
       // Clear all jobs (this should send cancel-all)
       queue.setJobs([]);
 
       // Wait a bit (but not long enough for jobs to complete)
-      await wait(60);
+      await sleep(60);
 
       // At most one job might complete if it was already running when cancelled
       // The currently running job cannot be cancelled, so it will complete
@@ -679,7 +676,7 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 1,
       });
 
-      await wait(10);
+      await sleep(10);
       expect(MockWorker.workers.length).toBe(3);
 
       const initialTerminations = MockWorker.termnations;
@@ -760,14 +757,14 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(10);
+      await sleep(10);
 
       queue.setJobs([
         { jobId: "job1", data: 10 },
         { jobId: "job2", data: 20 },
       ]);
 
-      await wait(10);
+      await sleep(10);
 
       queue.destroy();
 
@@ -796,14 +793,14 @@ describe("WorkerQueue", () => {
         requeueWhenRemaning: 0,
       });
 
-      await wait(10);
+      await sleep(10);
 
       queue.setJobs([
         { jobId: "job1", data: 100 }, // Long sleep
         { jobId: "job2", data: 100 }, // Long sleep
       ]);
 
-      await wait(10);
+      await sleep(10);
 
       const initialTerminations = MockWorker.termnations;
       queue.destroy();

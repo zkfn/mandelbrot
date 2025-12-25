@@ -6,14 +6,14 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": {
-      "development": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
+    "./*": {
+      "types": "./dist/workers/*.d.ts",
+      "import": "./dist/workers/*.js",
+      "default": "./dist/workers/*.js"
     }
   },
   "scripts": {
+    "build:vite": "tsc && tsx build-workers.ts",
     "build": "tsc",
     "dev": "tsc --watch",
     "type-check": "tsc --noEmit",
@@ -24,6 +24,8 @@
     "@mandelbrot/common": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "tsx": "^4.21.0",
+    "vite": "^7.2.4"
   }
 }

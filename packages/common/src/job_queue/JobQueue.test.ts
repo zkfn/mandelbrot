@@ -1,13 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { sleep } from "../utils";
 import type { ResultMessage } from "../worker_protocol";
 import { JobQueue } from "./JobQueue";
 
-const wait = async (millis: number) => {
-  await new Promise((resolve) => setTimeout(resolve, millis));
-};
-
 const sleepRunner = vi.fn(async (data: { sleepMs: number; value: number }) => {
-  await wait(data.sleepMs);
+  await sleep(data.sleepMs);
   return data.value;
 });
 
@@ -29,7 +26,7 @@ describe("JobQueue", () => {
 
       queue.push({ jobId: "job1", data: { sleepMs: 10, value: 5 }, generation: 0 });
 
-      await wait(30);
+      await sleep(30);
 
       expect(sleepRunner).toHaveBeenCalledTimes(1);
       expect(sleepRunner).toHaveBeenCalledWith({ sleepMs: 10, value: 5 });
@@ -48,13 +45,13 @@ describe("JobQueue", () => {
     it("should process jobs sequentially", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(20);
+      await sleep(20);
 
       queue.push({ jobId: "job1", data: { sleepMs: 5, value: 1 }, generation: 0 });
       queue.push({ jobId: "job2", data: { sleepMs: 5, value: 2 }, generation: 0 });
       queue.push({ jobId: "job3", data: { sleepMs: 5, value: 3 }, generation: 0 });
 
-      await wait(50);
+      await sleep(50);
 
       expect(results).toHaveLength(3);
       expect(results[0]).toEqual({
@@ -87,7 +84,7 @@ describe("JobQueue", () => {
       queue.push({ jobId: "job1", data: { sleepMs: 10, value: 1 }, generation: 0 });
 
       // Wait for it to complete and queue to be empty
-      await wait(30);
+      await sleep(30);
 
       expect(callback).toHaveBeenCalledTimes(1);
       expect(results[0]).toEqual({
@@ -101,7 +98,7 @@ describe("JobQueue", () => {
       // Push another job - should resume processing
       queue.push({ jobId: "job2", data: { sleepMs: 10, value: 2 }, generation: 0 });
 
-      await wait(30);
+      await sleep(30);
 
       expect(callback).toHaveBeenCalledTimes(2);
       expect(results[1]).toEqual({
@@ -116,14 +113,14 @@ describe("JobQueue", () => {
     it("should handle multiple jobs queued before processing starts", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       // Push multiple jobs before any processing
       queue.push({ jobId: "job1", data: { sleepMs: 10, value: 1 }, generation: 0 });
       queue.push({ jobId: "job2", data: { sleepMs: 10, value: 2 }, generation: 0 });
       queue.push({ jobId: "job3", data: { sleepMs: 10, value: 3 }, generation: 0 });
 
-      await wait(50);
+      await sleep(50);
 
       expect(sleepRunner).toHaveBeenCalledTimes(3);
       expect(callback).toHaveBeenCalledTimes(3);
@@ -135,11 +132,11 @@ describe("JobQueue", () => {
     it("should call callback with correct jobId, generation, and result", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push({ jobId: "job-123", data: { sleepMs: 10, value: 42 }, generation: 5 });
 
-      await wait(30);
+      await sleep(30);
 
       expect(callback).toHaveBeenCalledTimes(1);
       expect(results[0]).toEqual({
@@ -154,13 +151,13 @@ describe("JobQueue", () => {
     it("should preserve generation across job processing", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push({ jobId: "job1", data: { sleepMs: 10, value: 1 }, generation: 10 });
       queue.push({ jobId: "job2", data: { sleepMs: 10, value: 2 }, generation: 20 });
       queue.push({ jobId: "job3", data: { sleepMs: 10, value: 3 }, generation: 30 });
 
-      await wait(50);
+      await sleep(50);
 
       expect(results).toHaveLength(3);
       expect(results[0].generation).toBe(10);
@@ -171,13 +168,13 @@ describe("JobQueue", () => {
     it("should include remainingJobs in callback", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push({ jobId: "job1", data: { sleepMs: 10, value: 1 }, generation: 0 });
       queue.push({ jobId: "job2", data: { sleepMs: 10, value: 2 }, generation: 0 });
       queue.push({ jobId: "job3", data: { sleepMs: 10, value: 3 }, generation: 0 });
 
-      await wait(50);
+      await sleep(50);
 
       expect(results).toHaveLength(3);
       // First job completes with 2 remaining
@@ -193,7 +190,7 @@ describe("JobQueue", () => {
     it("should cancel queued jobs by jobId", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push({ jobId: "job1", data: { sleepMs: 20, value: 1 }, generation: 0 });
       queue.push({ jobId: "job2", data: { sleepMs: 20, value: 2 }, generation: 0 });
@@ -201,10 +198,10 @@ describe("JobQueue", () => {
 
       // Cancel job2 before it starts processing
       // Wait a bit to ensure job1 has started
-      await wait(10);
+      await sleep(10);
       queue.cancel(["job2"]);
 
-      await wait(80);
+      await sleep(80);
 
       // Only job1 and job3 should be processed
       expect(sleepRunner).toHaveBeenCalledTimes(2);
@@ -217,14 +214,14 @@ describe("JobQueue", () => {
     it("should return CancelledMessage with cancelled jobIds and remainingJobs", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push({ jobId: "job1", data: { sleepMs: 20, value: 1 }, generation: 0 });
       queue.push({ jobId: "job2", data: { sleepMs: 20, value: 2 }, generation: 0 });
       queue.push({ jobId: "job3", data: { sleepMs: 20, value: 3 }, generation: 0 });
 
       // Wait a bit to ensure job1 has started
-      await wait(10);
+      await sleep(10);
 
       const cancelledMessage = queue.cancel(["job2"]);
 
@@ -238,7 +235,7 @@ describe("JobQueue", () => {
     it("should return empty jobIds array when cancelling non-existent jobs", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push({ jobId: "job1", data: { sleepMs: 10, value: 1 }, generation: 0 });
 
@@ -254,7 +251,7 @@ describe("JobQueue", () => {
     it("should cancel multiple jobs", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push({ jobId: "job1", data: { sleepMs: 20, value: 1 }, generation: 0 });
       queue.push({ jobId: "job2", data: { sleepMs: 20, value: 2 }, generation: 0 });
@@ -262,10 +259,10 @@ describe("JobQueue", () => {
       queue.push({ jobId: "job4", data: { sleepMs: 20, value: 4 }, generation: 0 });
 
       // Wait a bit to ensure job1 has started
-      await wait(10);
+      await sleep(10);
       queue.cancel(["job2", "job4"]);
 
-      await wait(80);
+      await sleep(80);
 
       expect(callback).toHaveBeenCalledTimes(2);
       expect(results[0].jobId).toBe("job1");
@@ -275,18 +272,18 @@ describe("JobQueue", () => {
     it("should not cancel currently running job", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push({ jobId: "job1", data: { sleepMs: 50, value: 1 }, generation: 0 });
       queue.push({ jobId: "job2", data: { sleepMs: 20, value: 2 }, generation: 0 });
 
       // Wait a bit for job1 to start
-      await wait(10);
+      await sleep(10);
 
       // Try to cancel job1 (should not work as it's running)
       queue.cancel(["job1"]);
 
-      await wait(100);
+      await sleep(100);
 
       // job1 should still complete
       expect(callback).toHaveBeenCalledTimes(2);
@@ -297,14 +294,14 @@ describe("JobQueue", () => {
     it("should handle cancelling non-existent jobIds", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push({ jobId: "job1", data: { sleepMs: 10, value: 1 }, generation: 0 });
 
       // Cancel a job that doesn't exist
       queue.cancel(["non-existent"]);
 
-      await wait(30);
+      await sleep(30);
 
       // job1 should still be processed
       expect(callback).toHaveBeenCalledTimes(1);
@@ -316,17 +313,17 @@ describe("JobQueue", () => {
     it("should cancel all queued jobs", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push({ jobId: "job1", data: { sleepMs: 20, value: 1 }, generation: 0 });
       queue.push({ jobId: "job2", data: { sleepMs: 20, value: 2 }, generation: 0 });
       queue.push({ jobId: "job3", data: { sleepMs: 20, value: 3 }, generation: 0 });
 
       // Wait a bit to ensure job1 has started
-      await wait(10);
+      await sleep(10);
       queue.terminate();
 
-      await wait(50);
+      await sleep(50);
 
       // Only the first job (if it started) should complete
       // The rest should be cancelled
@@ -337,18 +334,18 @@ describe("JobQueue", () => {
     it("should not cancel currently running job", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push({ jobId: "job1", data: { sleepMs: 50, value: 1 }, generation: 0 });
       queue.push({ jobId: "job2", data: { sleepMs: 20, value: 2 }, generation: 0 });
       queue.push({ jobId: "job3", data: { sleepMs: 20, value: 3 }, generation: 0 });
 
       // Wait for job1 to start
-      await wait(10);
+      await sleep(10);
 
       queue.terminate();
 
-      await wait(100);
+      await sleep(100);
 
       // job1 should complete (it was running)
       // job2 and job3 should be cancelled
@@ -359,14 +356,14 @@ describe("JobQueue", () => {
     it("should return CancelledMessage with all queued jobIds when cancelling all", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push({ jobId: "job1", data: { sleepMs: 20, value: 1 }, generation: 0 });
       queue.push({ jobId: "job2", data: { sleepMs: 20, value: 2 }, generation: 0 });
       queue.push({ jobId: "job3", data: { sleepMs: 20, value: 3 }, generation: 0 });
 
       // Wait a bit to ensure job1 has started (it's no longer in the queue)
-      await wait(10);
+      await sleep(10);
 
       const cancelledMessage = queue.terminate();
 
@@ -381,12 +378,12 @@ describe("JobQueue", () => {
     it("should return finishingComputation false when terminating while waiting", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push({ jobId: "job1", data: { sleepMs: 10, value: 1 }, generation: 0 });
 
       // Wait for job1 to complete
-      await wait(30);
+      await sleep(30);
 
       // Now queue should be waiting
       const cancelledMessage = queue.terminate();
@@ -403,7 +400,7 @@ describe("JobQueue", () => {
     it("should return the number of queued jobs", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       expect(queue.queuedJobs()).toBe(0);
 
@@ -416,20 +413,20 @@ describe("JobQueue", () => {
       queue.push({ jobId: "job3", data: { sleepMs: 20, value: 3 }, generation: 0 });
       expect(queue.queuedJobs()).toBe(2); // job2 and job3 are queued
 
-      await wait(100);
+      await sleep(100);
     });
 
     it("should return 0 when queue is empty and waiting", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       expect(queue.queuedJobs()).toBe(0);
 
       queue.push({ jobId: "job1", data: { sleepMs: 10, value: 1 }, generation: 0 });
 
       // Wait for job to complete
-      await wait(30);
+      await sleep(30);
 
       expect(queue.queuedJobs()).toBe(0);
     });
@@ -439,7 +436,7 @@ describe("JobQueue", () => {
     it("should accept multiple jobs as variadic arguments", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push(
         { jobId: "job1", data: { sleepMs: 10, value: 1 }, generation: 0 },
@@ -447,7 +444,7 @@ describe("JobQueue", () => {
         { jobId: "job3", data: { sleepMs: 10, value: 3 }, generation: 0 }
       );
 
-      await wait(50);
+      await sleep(50);
 
       expect(callback).toHaveBeenCalledTimes(3);
       expect(results[0].jobId).toBe("job1");
@@ -458,7 +455,7 @@ describe("JobQueue", () => {
     it("should process multiple pushed jobs sequentially", async () => {
       const queue = new JobQueue(sleepRunner, callback);
 
-      await wait(10);
+      await sleep(10);
 
       queue.push(
         { jobId: "job1", data: { sleepMs: 20, value: 1 }, generation: 0 },
@@ -466,13 +463,13 @@ describe("JobQueue", () => {
       );
 
       // First job should complete (20ms sleep + buffer)
-      await wait(40);
+      await sleep(40);
       expect(callback).toHaveBeenCalledTimes(1);
       expect(results[0].jobId).toBe("job1");
       expect(results[0].remainingJobs).toBe(1); // job2 is still queued
 
       // Second job should complete (20ms sleep + buffer)
-      await wait(40);
+      await sleep(40);
       expect(callback).toHaveBeenCalledTimes(2);
       expect(results[1].jobId).toBe("job2");
       expect(results[1].remainingJobs).toBe(0); // no more jobs

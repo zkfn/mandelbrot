@@ -10,6 +10,14 @@
       "cache": false,
       "persistent": true
     },
+    "bench": {
+      "dependsOn": ["^build", "^build:vite"],
+      "outputs": []
+    },
+    "build:vite": {
+      "dependsOn": ["^build:vite"],
+      "outputs": []
+    },
     "lint": {
       "dependsOn": ["^lint"],
       "outputs": []
@@ -30,6 +38,15 @@
       "cache": false,
       "persistent": true,
       "outputs": []
+    },
+    "preview": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "deploy": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
     }
   }
 }

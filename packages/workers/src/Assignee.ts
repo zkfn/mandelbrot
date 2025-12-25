@@ -1,15 +1,15 @@
 import { JobQueue } from "@mandelbrot/common/";
 import type { QueueToWorkerMessage, ResultMessage } from "@mandelbrot/common/worker-protocol";
 
-export abstract class Assignee<TData, TResult> {
+export class Assignee<TData, TResult> {
   private jobQueue: JobQueue<TData, TResult>;
+  private run: (data: TData) => Promise<TResult>;
 
-  public constructor() {
+  public constructor(run: (data: TData) => Promise<TResult>) {
+    this.run = run;
     this.jobQueue = new JobQueue(this.run, this.onResult);
     self.onmessage = this.onMessage;
   }
-
-  abstract run(data: TData): Promise<TResult>;
 
   protected onResult(result: ResultMessage<TResult>): void {
     self.postMessage(result);
