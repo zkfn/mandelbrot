@@ -3,6 +3,7 @@ export interface Calc<T> {
   sub(a: T, b: T): T;
   mult(a: T, b: T): T;
   multNum(a: T, num: number): T;
+  inv2Exp(exp: number): T;
   zero(): T;
   copy(val: T): T;
 }
@@ -22,6 +23,10 @@ export const NumberCalc: Calc<number> = {
 
   multNum(a: number, num: number): number {
     return a * num;
+  },
+
+  inv2Exp(exp: number): number {
+    return 1 / 2 ** exp;
   },
 
   zero(): number {
