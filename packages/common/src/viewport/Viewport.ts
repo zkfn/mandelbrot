@@ -50,8 +50,8 @@ export class Viewport<T> {
   }
 
   // TODO: zoom at focus point
-  public zoomAtPixels(zoom2Exp: number, _focusPoint?: Vec2<number>) {
-    this.zoom2Exp = zoom2Exp;
+  public zoomByAtPixels(deltaZoom2Exp: number, _focusPoint?: Vec2<number>) {
+    this.zoom2Exp -= deltaZoom2Exp;
     this.dirty = true;
   }
 
