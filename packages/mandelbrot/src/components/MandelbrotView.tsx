@@ -26,33 +26,21 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
       ctx.rect(0, 0, canvasRef.width, canvasRef.height);
       ctx.fill();
 
-      const upp = viewport.getUnitsPerPixel();
-      const { topleft, bottomright } = viewport.getBoundsImgPlane();
+      const drawLines = (gap: number, stroke: number) => {
+        const { horizontalLines, verticalLines } = viewport.getGridLines(gap);
 
-      const minX = topleft.x;
-      const maxX = bottomright.x;
+        for (const line of [...horizontalLines, ...verticalLines]) {
+          ctx.beginPath();
+          ctx.moveTo(line.aPx.x, line.aPx.y);
+          ctx.lineTo(line.bPx.x, line.bPx.y);
+          ctx.lineWidth = stroke;
+          ctx.stroke();
+        }
+      };
 
-      const minY = topleft.y;
-      const maxY = bottomright.y;
-
-      const width = maxX - minX;
-      const height = maxY - minY;
-
-      for (let x = minX; x < width; x += 0.1) {
-        ctx.beginPath();
-        ctx.moveTo((x - minX) / upp, 0);
-        ctx.lineTo((x - minX) / upp, height / upp);
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      for (let y = minY; y < height; y += 0.1) {
-        ctx.beginPath();
-        ctx.moveTo(0, (y - minY) / upp);
-        ctx.lineTo(width / upp, (y - minY) / upp);
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
+      drawLines(50, 1);
+      drawLines(100, 2);
+      drawLines(200, 3);
     };
 
     const resizeCanvas = () => {

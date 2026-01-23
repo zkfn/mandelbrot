@@ -1,19 +1,5 @@
-import type { Calc } from "../numeric";
-
-export type AspectRatio = {
-  width: number;
-  height: number;
-};
-
-export type Vec2<T = number> = {
-  x: T;
-  y: T;
-};
-
-export type PointRect<T = number> = {
-  topleft: Vec2<T>;
-  bottomright: Vec2<T>;
-};
+import type { Calc, RectPoints, RectWH, Vec2 } from "../numeric";
+import { computeGridLinesFactory, type GridLinesCalc } from "./PlaneGrid";
 
 /**
  * Zooming
@@ -26,17 +12,20 @@ export type PointRect<T = number> = {
 
 export class Viewport<T> {
   private calc: Calc<T>;
+  private gridLinesCalc: GridLinesCalc<T>;
 
-  private unitsPerPixel: T;
-  private inPixels: AspectRatio;
+  private zoom2Exp: number;
+  private inPixels: RectWH<number>;
   private center: Vec2<T>;
   private angleRad: number;
   private dirty: boolean;
 
-  public constructor(calc: Calc<T>, aspect: AspectRatio, center?: Vec2<T>, angleRad?: number) {
+  public constructor(calc: Calc<T>, aspect: RectWH<number>, center?: Vec2<T>, angleRad?: number) {
     this.calc = calc;
+    this.gridLinesCalc = computeGridLinesFactory(calc);
+
     this.inPixels = { ...aspect };
-    this.unitsPerPixel = this.calc.inv2Exp(10); // TODO: Set some default
+    this.zoom2Exp = 10;
     this.center = center ?? { x: this.calc.zero(), y: this.calc.zero() };
     this.angleRad = angleRad ?? 0;
 
@@ -55,15 +44,14 @@ export class Viewport<T> {
     this.dirty = true;
   }
 
-  public resize(aspect: AspectRatio): void {
+  public resize(aspect: RectWH<number>): void {
     this.inPixels = { ...aspect };
     this.dirty = true;
   }
 
   // TODO: zoom at focus point
   public zoomAtPixels(zoom2Exp: number, _focusPoint?: Vec2<number>) {
-    this.unitsPerPixel = this.calc.inv2Exp(zoom2Exp);
-
+    this.zoom2Exp = zoom2Exp;
     this.dirty = true;
   }
 
@@ -79,7 +67,7 @@ export class Viewport<T> {
   }
 
   public getUnitsPerPixel(): T {
-    return this.unitsPerPixel;
+    return this.calc.inv2Exp(this.zoom2Exp);
   }
 
   public readAndClearDirty() {
@@ -89,14 +77,15 @@ export class Viewport<T> {
     return wasDirty;
   }
 
-  public getBoundsImgPlane(): PointRect<T> {
+  public getBoundsImgPlane(): RectPoints<T> {
     const { width, height } = this.inPixels;
 
     const halfWidthPx = width / 2;
     const halfHeightPx = height / 2;
+    const unitsPerPixel = this.getUnitsPerPixel();
 
-    const halfWidth = this.calc.multNum(this.unitsPerPixel, halfWidthPx);
-    const halfHeight = this.calc.multNum(this.unitsPerPixel, halfHeightPx);
+    const halfWidth = this.calc.multNum(halfWidthPx, unitsPerPixel);
+    const halfHeight = this.calc.multNum(halfHeightPx, unitsPerPixel);
 
     const topleft: Vec2<T> = {
       x: this.calc.sub(this.center.x, halfWidth),
@@ -112,5 +101,9 @@ export class Viewport<T> {
       topleft,
       bottomright,
     };
+  }
+
+  public getGridLines(gapPx: number) {
+    return this.gridLinesCalc(gapPx, this.zoom2Exp, this.inPixels, this.getBoundsImgPlane());
   }
 }
