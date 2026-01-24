@@ -21,6 +21,12 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     ctx.rect(0, 0, canvasRef.width, canvasRef.height);
     ctx.fill();
 
+    ctx.beginPath();
+    ctx.fillStyle = "red";
+    ctx.rect(canvasRef.width - 60, canvasRef.height - 60, 50, 50);
+    ctx.rect(canvasRef.width / 2 - 50, canvasRef.height / 2 - 50, 100, 100);
+    ctx.fill();
+
     const drawLines = (gap: number, stroke: number) => {
       const { horizontalLines, verticalLines } = viewport.getGridLines(gap);
 
@@ -90,13 +96,17 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     viewport.zoomByAtPixels(by);
   };
 
-  const pointerEvents = createPointerEvents(canvasRef, {
+  const pointerEvents = createPointerEvents({
+    canvas: canvasRef,
     onZoom: zoom,
+    onStop: () => console.log("Stop"),
+    onStart: () => console.log("Start"),
+    onMove: console.log,
   });
 
   return (
     <div ref={wrapperRef} {...props}>
-      <canvas ref={canvasRef} {...pointerEvents} />
+      <canvas style={{ "touch-action": "none" }} ref={canvasRef} {...pointerEvents} />
     </div>
   );
 };

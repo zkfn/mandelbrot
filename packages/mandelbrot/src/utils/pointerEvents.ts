@@ -3,13 +3,14 @@ import type { Vec2 } from "@mandelbrot/common";
 const WHEEL_ZOOM_SCALE = 0.002;
 
 type PointerEvents = {
+  canvas: HTMLCanvasElement;
   onStart: () => unknown;
   onStop: () => unknown;
   onMove: (deltaXPx: number, deltaYPx: number) => unknown;
   onZoom: (factor: number, midpointXPx: number, midpointYPx: number) => unknown;
 };
 
-export const createPointerEvents = (canvas: HTMLCanvasElement, events: Partial<PointerEvents>) => {
+export const createPointerEvents = (ctx: Partial<PointerEvents>) => {
   const pointers = new Map<number, Vec2<number>>();
   let lastPinchDist = 0;
 
@@ -25,13 +26,12 @@ export const createPointerEvents = (canvas: HTMLCanvasElement, events: Partial<P
 
   const onWheel = (event: WheelEvent) => {
     event.preventDefault();
-
-    events.onZoom?.(event.deltaY * WHEEL_ZOOM_SCALE, event.clientX, event.clientY);
+    ctx.onZoom?.(event.deltaY * WHEEL_ZOOM_SCALE, event.clientX, event.clientY);
   };
 
   const onPointerDown = (event: PointerEvent) => {
-    canvas.setPointerCapture(event.pointerId);
     event.preventDefault();
+    ctx.canvas?.setPointerCapture(event.pointerId);
 
     pointers.set(event.pointerId, {
       x: event.clientX,
@@ -39,7 +39,7 @@ export const createPointerEvents = (canvas: HTMLCanvasElement, events: Partial<P
     });
 
     if (pointers.size === 1) {
-      events.onStart?.();
+      ctx.onStart?.();
     }
 
     if (pointers.size === 2) {
@@ -66,7 +66,7 @@ export const createPointerEvents = (canvas: HTMLCanvasElement, events: Partial<P
       const [x0, y0] = [prev.x, prev.y];
       const [cx, cy] = [event.clientX, event.clientY];
 
-      events.onMove?.(x0 - cx, y0 - cy);
+      ctx.onMove?.(x0 - cx, y0 - cy);
     }
 
     if (pointers.size === 2) {
@@ -77,7 +77,7 @@ export const createPointerEvents = (canvas: HTMLCanvasElement, events: Partial<P
         const factor = dist / lastPinchDist;
         const { x: mx, y: my } = midpoint(a, b);
 
-        events.onZoom?.(factor, mx, my);
+        ctx.onZoom?.(-factor, mx, my);
       }
 
       lastPinchDist = dist;
@@ -94,19 +94,21 @@ export const createPointerEvents = (canvas: HTMLCanvasElement, events: Partial<P
   };
 
   const onPointerUp = (event: PointerEvent) => {
+    event.preventDefault();
     pointers.delete(event.pointerId);
+
     if (pointers.size <= 1) {
       lastPinchDist = 0;
     }
     if (pointers.size === 0) {
-      events.onStop?.();
+      ctx.onStop?.();
     }
   };
 
   return {
     onPointerDown,
     onPointerUp,
-    onPointerMove,
-    onWheel,
+    "on:pointermove": { handleEvent: onPointerMove, passive: false },
+    "on:wheel": { handleEvent: onWheel, passive: false },
   };
 };
