@@ -1,6 +1,7 @@
 import { NumberCalc, Viewport } from "@mandelbrot/common";
 import { type JSX, onMount } from "solid-js";
 import { createCanvasEvents } from "../utils/canvasEvents";
+import { createPointerEvents } from "../utils/pointerEvents";
 
 type MandelbrotViewProps = JSX.HTMLAttributes<HTMLDivElement>;
 
@@ -86,18 +87,16 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
   });
 
   const zoom = (by: number) => {
-    viewport.zoomByAtPixels(by * 0.002);
+    viewport.zoomByAtPixels(by);
   };
+
+  const pointerEvents = createPointerEvents(canvasRef, {
+    onZoom: zoom,
+  });
 
   return (
     <div ref={wrapperRef} {...props}>
-      <canvas
-        ref={canvasRef}
-        onWheel={(e) => {
-          e.preventDefault();
-          zoom(e.deltaY);
-        }}
-      />
+      <canvas ref={canvasRef} {...pointerEvents} />
     </div>
   );
 };
