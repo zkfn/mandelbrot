@@ -92,16 +92,18 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     };
   });
 
-  const zoom = (by: number) => {
-    viewport.zoomByAtPixels(by);
-  };
-
   const pointerEvents = createPointerEvents({
     canvas: canvasRef,
-    onZoom: zoom,
-    onStop: () => console.log("Stop"),
-    onStart: () => console.log("Start"),
-    onMove: console.log,
+    onZoom: (by, mx, my) =>
+      viewport.zoomByAtPixels(by, {
+        x: (mx - canvasRef.clientLeft) * window.devicePixelRatio,
+        y: (my - canvasRef.clientTop) * window.devicePixelRatio,
+      }),
+    onMove: (x, y) =>
+      viewport.moveByPixels({
+        x: x * window.devicePixelRatio,
+        y: y * window.devicePixelRatio,
+      }),
   });
 
   return (

@@ -32,13 +32,22 @@ export class Viewport<T> {
     this.dirty = true;
   }
 
-  public moveBy(offset: Vec2<T>) {
+  public moveByPixels({ x: offsetX, y: offsetY }: Vec2<number>) {
+    const upp = this.getUnitsPerPixel();
+
+    this.moveByUnits({
+      x: this.calc.multNum(offsetX, upp),
+      y: this.calc.multNum(offsetY, upp),
+    });
+  }
+
+  public moveByUnits(offset: Vec2<T>) {
     const { x: offX, y: offY } = offset;
     const { x, y } = this.center;
 
     this.center = {
-      x: this.calc.sub(x, offX),
-      y: this.calc.sub(y, offY),
+      x: this.calc.add(x, offX),
+      y: this.calc.add(y, offY),
     };
 
     this.dirty = true;
@@ -49,9 +58,33 @@ export class Viewport<T> {
     this.dirty = true;
   }
 
-  // TODO: zoom at focus point
-  public zoomByAtPixels(deltaZoom2Exp: number, _focusPoint?: Vec2<number>) {
+  public zoomByAtPixels(deltaZoom2Exp: number, focusPointPx: Vec2<number>) {
+    const uppBefore = this.getUnitsPerPixel();
+
+    const centerOffsetPx = {
+      x: focusPointPx.x - this.inPixels.width / 2,
+      y: focusPointPx.y - this.inPixels.height / 2,
+    };
+
+    // This point needs to remain mapped to the same pixel after the zoom
+    const focusPointPlane = {
+      x: this.calc.add(this.calc.multNum(centerOffsetPx.x, uppBefore), this.center.x),
+      y: this.calc.add(this.calc.multNum(centerOffsetPx.y, uppBefore), this.center.y),
+    };
+
     this.zoom2Exp -= deltaZoom2Exp;
+    const uppAfter = this.getUnitsPerPixel();
+
+    const centerOffsetPlaneAfter = {
+      x: this.calc.multNum(centerOffsetPx.x, uppAfter),
+      y: this.calc.multNum(centerOffsetPx.y, uppAfter),
+    };
+
+    this.center = {
+      x: this.calc.sub(focusPointPlane.x, centerOffsetPlaneAfter.x),
+      y: this.calc.sub(focusPointPlane.y, centerOffsetPlaneAfter.y),
+    };
+
     this.dirty = true;
   }
 
