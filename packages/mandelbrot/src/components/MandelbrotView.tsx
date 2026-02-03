@@ -1,4 +1,4 @@
-import { NumberCalc, Viewport } from "@mandelbrot/common";
+import { NumberCalc, Viewport, ViewportController } from "@mandelbrot/common";
 import { createSignal, type JSX, onMount } from "solid-js";
 import { createCanvasEvents } from "../utils/canvasEvents";
 import { createPointerEvents } from "../utils/pointerEvents";
@@ -9,7 +9,10 @@ type MandelbrotViewProps = JSX.HTMLAttributes<HTMLDivElement>;
 const MandelbrotView = (props: MandelbrotViewProps) => {
   let canvasRef!: HTMLCanvasElement;
   let wrapperRef!: HTMLDivElement;
-  const viewport = new Viewport(NumberCalc, canvasRef);
+
+  const viewport = new Viewport({ pixelSize: { width: 0, height: 0 } }, NumberCalc);
+
+  const viewportController = new ViewportController(NumberCalc, viewport);
 
   const [tooltip, setTooltip] = createSignal<TooltipState>({
     x: 0,
@@ -85,7 +88,7 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     canvasRef.width = width;
     canvasRef.height = height;
 
-    viewport.resize({ width, height });
+    viewportController.resize(width, height);
 
     canvasRef.style.width = `${wrapperRef.clientWidth}px`;
     canvasRef.style.height = `${wrapperRef.clientHeight}px`;
@@ -94,7 +97,7 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
   };
 
   const render = (_deltaMillis: number) => {
-    if (viewport.readAndClearDirty()) {
+    if (viewportController.readAndClearDirty()) {
       redraw();
     }
   };
@@ -129,13 +132,13 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     canvas: canvasRef,
 
     onZoom: (by, mx, my) =>
-      viewport.zoomByAtPixels(by, {
+      viewportController.zoomByAtPixels(by, {
         x: (mx - canvasRef.clientLeft) * window.devicePixelRatio,
         y: (my - canvasRef.clientTop) * window.devicePixelRatio,
       }),
 
     onMove: (x, y) =>
-      viewport.moveByPixels({
+      viewportController.moveByPixels({
         x: x * window.devicePixelRatio,
         y: y * window.devicePixelRatio,
       }),
@@ -147,7 +150,7 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
       const y = yPx - rect.top;
       const dpr = window.devicePixelRatio || 1;
 
-      const planeCoords = viewport.pixelToPlane({
+      const planeCoords = viewportController.pixelToPlane({
         x: x * dpr,
         y: y * dpr,
       });
