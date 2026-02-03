@@ -2,19 +2,9 @@ import { NumberCalc, Viewport } from "@mandelbrot/common";
 import { createSignal, type JSX, onMount } from "solid-js";
 import { createCanvasEvents } from "../utils/canvasEvents";
 import { createPointerEvents } from "../utils/pointerEvents";
-import CoordinateTooltip from "./CoordinateTooltip";
+import { CoordinateTooltip, type TooltipState } from "./CoordinateTooltip";
 
 type MandelbrotViewProps = JSX.HTMLAttributes<HTMLDivElement>;
-
-type TooltipState = {
-  x: number;
-  y: number;
-  planeX: number;
-  planeY: number;
-  visible: boolean;
-  containerWidth: number;
-  containerHeight: number;
-};
 
 const MandelbrotView = (props: MandelbrotViewProps) => {
   let canvasRef!: HTMLCanvasElement;
@@ -137,25 +127,31 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
 
   const pointerEvents = createPointerEvents({
     canvas: canvasRef,
+
     onZoom: (by, mx, my) =>
       viewport.zoomByAtPixels(by, {
         x: (mx - canvasRef.clientLeft) * window.devicePixelRatio,
         y: (my - canvasRef.clientTop) * window.devicePixelRatio,
       }),
+
     onMove: (x, y) =>
       viewport.moveByPixels({
         x: x * window.devicePixelRatio,
         y: y * window.devicePixelRatio,
       }),
+
     onPointerPosition: (xPx, yPx) => {
       const rect = canvasRef.getBoundingClientRect();
+
       const x = xPx - rect.left;
       const y = yPx - rect.top;
       const dpr = window.devicePixelRatio || 1;
+
       const planeCoords = viewport.pixelToPlane({
         x: x * dpr,
         y: y * dpr,
       });
+
       setTooltip({
         x,
         y,

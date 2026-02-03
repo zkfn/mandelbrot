@@ -1,6 +1,6 @@
 import { Show } from "solid-js";
 
-type CoordinateTooltipProps = {
+export type TooltipState = {
   x: number;
   y: number;
   planeX: number;
@@ -10,7 +10,7 @@ type CoordinateTooltipProps = {
   containerHeight: number;
 };
 
-const CoordinateTooltip = (props: CoordinateTooltipProps) => {
+export const CoordinateTooltip = (props: TooltipState) => {
   const offset = 16;
   const flipThreshold = 2 / 3;
 
@@ -37,5 +37,3 @@ const CoordinateTooltip = (props: CoordinateTooltipProps) => {
     </Show>
   );
 };
-
-export default CoordinateTooltip;
