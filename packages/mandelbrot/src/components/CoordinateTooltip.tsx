@@ -12,7 +12,7 @@ export type TooltipState = {
 
 export const CoordinateTooltip = (props: TooltipState) => {
   const offset = 16;
-  const flipThreshold = 2 / 3;
+  const flipThreshold = 4 / 5;
 
   const flipX = () => props.x > props.containerWidth * flipThreshold;
   const flipY = () => props.y > props.containerHeight * flipThreshold;
