@@ -7,4 +7,31 @@
     @apply font-mono text-xs whitespace-pre;
     @apply bg-black/75 text-white px-3 py-2 rounded-md;
   }
+
+  .controls-panel {
+    @apply absolute top-2 left-2 z-20;
+    @apply flex flex-col gap-2;
+    @apply bg-black/60 text-white p-2 rounded-md;
+    @apply font-sans text-sm;
+  }
+
+  .controls-group {
+    @apply flex gap-2 items-center;
+  }
+
+  .controls-panel button {
+    @apply px-3 py-1 rounded;
+    @apply bg-white/20 hover:bg-white/30;
+    @apply transition-colors duration-100;
+    @apply min-w-8;
+  }
+
+  .controls-panel label {
+    @apply flex items-center gap-1 cursor-pointer;
+    @apply select-none;
+  }
+
+  .controls-panel input[type="checkbox"] {
+    @apply cursor-pointer;
+  }
 }
