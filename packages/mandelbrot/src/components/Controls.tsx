@@ -12,11 +12,16 @@ type ControlsProps = {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onReset: () => void;
+  onDisplayChange?: () => void;
 };
 
 const Controls = (props: ControlsProps) => {
   const toggle = (key: keyof ControlsState) => {
     props.setState((prev) => ({ ...prev, [key]: !prev[key] }));
+    // Notify parent that display settings changed (for gridlines/labels)
+    if (key !== "showTooltip") {
+      props.onDisplayChange?.();
+    }
   };
 
   return (

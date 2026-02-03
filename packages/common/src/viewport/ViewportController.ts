@@ -4,12 +4,10 @@ import type { Viewport } from "./Viewport";
 export class ViewportController<T> {
   private calc: Calc<T>;
   private rect: Viewport<T>;
-  private dirty: boolean;
 
   public constructor(calc: Calc<T>, rect: Viewport<T>) {
     this.calc = calc;
     this.rect = rect;
-    this.dirty = true;
   }
 
   public moveByPixels({ x: offsetX, y: offsetY }: Vec2<number>) {
@@ -29,14 +27,11 @@ export class ViewportController<T> {
       x: this.calc.add(x, offX),
       y: this.calc.add(y, offY),
     };
-
-    this.dirty = true;
   }
 
   public resize(width: number, height: number): void {
     this.rect.pixelSize.width = width;
     this.rect.pixelSize.height = height;
-    this.dirty = true;
   }
 
   public zoomByAtPixels(deltaZoom2Exp: number, focusPointPx: Vec2<number>) {
@@ -66,14 +61,6 @@ export class ViewportController<T> {
       x: this.calc.sub(focusPointPlane.x, centerOffsetPlaneAfter.x),
       y: this.calc.sub(focusPointPlane.y, centerOffsetPlaneAfter.y),
     };
-
-    this.dirty = true;
-  }
-
-  public readAndClearDirty() {
-    const wasDirty = this.dirty;
-    this.dirty = false;
-    return wasDirty;
   }
 
   public pixelToPlane(pixelPos: Vec2<number>): Vec2<T> {

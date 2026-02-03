@@ -1,4 +1,5 @@
 import { NumberCalc, Viewport, ViewportController } from "@mandelbrot/common";
+import { DirtyFlag } from "@mandelbrot/common/utils";
 import { createSignal, type JSX, onMount } from "solid-js";
 import { createCanvasEvents } from "../utils/canvasEvents";
 import { createPointerEvents } from "../utils/pointerEvents";
@@ -21,6 +22,7 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
   );
 
   const viewportController = new ViewportController(NumberCalc, viewport);
+  const isDirty = new DirtyFlag(false);
 
   const initialCenter = { x: viewport.center.x, y: viewport.center.y };
   const initialZoom = viewport.zoom2Exp;
@@ -146,6 +148,7 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
 
     if (Math.abs(zoomDelta) > 0.001) {
       viewportController.zoomByAtPixels(zoomDelta, centerPx);
+      isDirty.setDirty();
     }
 
     if (progress >= 1) {
@@ -156,7 +159,7 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
   const render = (now: number) => {
     updateZoomAnimation(now);
 
-    if (viewportController.readAndClearDirty()) {
+    if (isDirty.readAndClear()) {
       redraw();
     }
   };
@@ -202,24 +205,29 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     viewport.center = { x: initialCenter.x, y: initialCenter.y };
     viewport.zoom2Exp = initialZoom;
     zoomAnimation = null;
-    viewportController.readAndClearDirty(); // Clear any pending dirty flag
     redraw();
   };
 
   const pointerEvents = createPointerEvents({
     canvas: canvasRef,
 
-    onZoom: (by, mx, my) =>
+    onZoom: (by, mx, my) => {
       viewportController.zoomByAtPixels(by, {
         x: (mx - canvasRef.clientLeft) * window.devicePixelRatio,
         y: (my - canvasRef.clientTop) * window.devicePixelRatio,
-      }),
+      });
 
-    onMove: (x, y) =>
+      isDirty.setDirty();
+    },
+
+    onMove: (x, y) => {
       viewportController.moveByPixels({
         x: x * window.devicePixelRatio,
         y: y * window.devicePixelRatio,
-      }),
+      });
+
+      isDirty.setDirty();
+    },
 
     onPointerPosition: (xPx, yPx) => {
       if (!controls().showTooltip) return;
@@ -265,6 +273,7 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onReset={handleReset}
+        onDisplayChange={() => isDirty.setDirty()}
       />
       {controls().showTooltip && <CoordinateTooltip {...tooltip()} />}
     </div>
