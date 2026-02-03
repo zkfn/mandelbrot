@@ -139,4 +139,18 @@ export class Viewport<T> {
   public getGridLines(gapPx: number) {
     return this.gridLinesCalc(gapPx, this.zoom2Exp, this.inPixels, this.getBoundsImgPlane());
   }
+
+  public pixelToPlane(pixelPos: Vec2<number>): Vec2<T> {
+    const upp = this.getUnitsPerPixel();
+
+    const centerOffsetPx = {
+      x: pixelPos.x - this.inPixels.width / 2,
+      y: pixelPos.y - this.inPixels.height / 2,
+    };
+
+    return {
+      x: this.calc.add(this.calc.multNum(centerOffsetPx.x, upp), this.center.x),
+      y: this.calc.add(this.calc.multNum(centerOffsetPx.y, upp), this.center.y),
+    };
+  }
 }

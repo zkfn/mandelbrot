@@ -1,14 +1,35 @@
 import { NumberCalc, Viewport } from "@mandelbrot/common";
-import { type JSX, onMount } from "solid-js";
+import { createSignal, type JSX, onMount } from "solid-js";
 import { createCanvasEvents } from "../utils/canvasEvents";
 import { createPointerEvents } from "../utils/pointerEvents";
+import CoordinateTooltip from "./CoordinateTooltip";
 
 type MandelbrotViewProps = JSX.HTMLAttributes<HTMLDivElement>;
+
+type TooltipState = {
+  x: number;
+  y: number;
+  planeX: number;
+  planeY: number;
+  visible: boolean;
+  containerWidth: number;
+  containerHeight: number;
+};
 
 const MandelbrotView = (props: MandelbrotViewProps) => {
   let canvasRef!: HTMLCanvasElement;
   let wrapperRef!: HTMLDivElement;
   const viewport = new Viewport(NumberCalc, canvasRef);
+
+  const [tooltip, setTooltip] = createSignal<TooltipState>({
+    x: 0,
+    y: 0,
+    planeX: 0,
+    planeY: 0,
+    visible: false,
+    containerWidth: 0,
+    containerHeight: 0,
+  });
 
   const redraw = () => {
     const ctx = canvasRef.getContext("2d");
@@ -27,8 +48,10 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     ctx.rect(canvasRef.width / 2 - 50, canvasRef.height / 2 - 50, 100, 100);
     ctx.fill();
 
-    const drawLines = (gap: number, stroke: number) => {
+    const drawLines = (gap: number, stroke: number, showLabels: boolean) => {
       const { horizontalLines, verticalLines } = viewport.getGridLines(gap);
+
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
 
       for (const line of [...horizontalLines, ...verticalLines]) {
         ctx.beginPath();
@@ -37,11 +60,31 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
         ctx.lineWidth = stroke;
         ctx.stroke();
       }
+
+      if (showLabels) {
+        const dpr = window.devicePixelRatio || 1;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+        ctx.font = `${10 * dpr}px monospace`;
+
+        for (const line of verticalLines) {
+          ctx.save();
+          ctx.translate(line.aPx.x + 4 * dpr, 16 * dpr);
+          ctx.fillText(line.label, 0, 0);
+          ctx.restore();
+        }
+
+        for (const line of horizontalLines) {
+          ctx.save();
+          ctx.translate(4 * dpr, line.aPx.y - 4 * dpr);
+          ctx.fillText(line.label, 0, 0);
+          ctx.restore();
+        }
+      }
     };
 
-    drawLines(50, 1);
-    drawLines(100, 2);
-    drawLines(200, 3);
+    drawLines(75, 1, false);
+    drawLines(150, 2, false);
+    drawLines(300, 3, true);
   };
 
   const resizeCanvas = () => {
@@ -104,11 +147,40 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
         x: x * window.devicePixelRatio,
         y: y * window.devicePixelRatio,
       }),
+    onPointerPosition: (xPx, yPx) => {
+      const rect = canvasRef.getBoundingClientRect();
+      const x = xPx - rect.left;
+      const y = yPx - rect.top;
+      const dpr = window.devicePixelRatio || 1;
+      const planeCoords = viewport.pixelToPlane({
+        x: x * dpr,
+        y: y * dpr,
+      });
+      setTooltip({
+        x,
+        y,
+        planeX: planeCoords.x,
+        planeY: planeCoords.y,
+        visible: true,
+        containerWidth: wrapperRef.clientWidth,
+        containerHeight: wrapperRef.clientHeight,
+      });
+    },
   });
 
+  const handleMouseLeave = () => {
+    setTooltip((prev) => ({ ...prev, visible: false }));
+  };
+
   return (
-    <div ref={wrapperRef} {...props}>
-      <canvas style={{ "touch-action": "none" }} ref={canvasRef} {...pointerEvents} />
+    <div ref={wrapperRef} style={{ position: "relative" }} {...props}>
+      <canvas
+        style={{ "touch-action": "none" }}
+        ref={canvasRef}
+        onMouseLeave={handleMouseLeave}
+        {...pointerEvents}
+      />
+      <CoordinateTooltip {...tooltip()} />
     </div>
   );
 };

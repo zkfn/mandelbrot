@@ -44,7 +44,7 @@ export const computeGridLinesFactory = <T>(calc: Calc<T>): GridLinesCalc<T> => {
 
       return {
         kind: "vertical",
-        label: x.toString(),
+        label: String(step),
         aPx: { x, y: 0 },
         bPx: { x, y: heightPx },
       };
@@ -55,7 +55,7 @@ export const computeGridLinesFactory = <T>(calc: Calc<T>): GridLinesCalc<T> => {
 
       return {
         kind: "horizontal",
-        label: y.toString(),
+        label: String(step),
         aPx: { y, x: 0 },
         bPx: { y, x: widthPx },
       };

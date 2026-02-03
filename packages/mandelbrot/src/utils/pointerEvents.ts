@@ -8,6 +8,7 @@ type PointerEvents = {
   onStop: () => unknown;
   onMove: (deltaXPx: number, deltaYPx: number) => unknown;
   onZoom: (factor: number, midpointXPx: number, midpointYPx: number) => unknown;
+  onPointerPosition: (xPx: number, yPx: number) => unknown;
 };
 
 export const createPointerEvents = (ctx: Partial<PointerEvents>) => {
@@ -50,6 +51,8 @@ export const createPointerEvents = (ctx: Partial<PointerEvents>) => {
 
   const onPointerMove = (event: PointerEvent) => {
     event.preventDefault();
+
+    ctx.onPointerPosition?.(event.clientX, event.clientY);
 
     if (!pointers.has(event.pointerId)) {
       return;
