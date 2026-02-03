@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@layer components {
+  .coordinate-tooltip {
+    @apply absolute z-10 transition-transform duration-100 ease-out;
+    @apply pointer-events-none;
+    @apply font-mono text-xs whitespace-pre;
+    @apply bg-black/75 text-white px-3 py-2 rounded-md;
+  }
+}
