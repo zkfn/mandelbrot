@@ -1,4 +1,4 @@
-import { NumberCalc, Viewport, ViewportController } from "@mandelbrot/common";
+import { MANDELBROT_BOUNDS, NumberCalc, Viewport, ViewportController } from "@mandelbrot/common";
 import { DirtyFlag } from "@mandelbrot/common/utils";
 import { createSignal, type JSX, onMount } from "solid-js";
 import { createCanvasEvents } from "../utils/canvasEvents";
@@ -8,7 +8,6 @@ import { CoordinateTooltip, type TooltipState } from "./CoordinateTooltip";
 
 type MandelbrotViewProps = JSX.HTMLAttributes<HTMLDivElement>;
 
-const INITIAL_ZOOM = 8;
 const ZOOM_STEP = 1;
 const ZOOM_ANIMATION_DURATION = 200;
 
@@ -16,16 +15,23 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
   let canvasRef!: HTMLCanvasElement;
   let wrapperRef!: HTMLDivElement;
 
+  const boundsCenter = {
+    x: (MANDELBROT_BOUNDS.minX + MANDELBROT_BOUNDS.maxX) / 2,
+    y: (MANDELBROT_BOUNDS.minY + MANDELBROT_BOUNDS.maxY) / 2,
+  };
+
   const viewport = new Viewport(
-    { pixelSize: { width: 0, height: 0 }, zoom2Exp: INITIAL_ZOOM },
+    { pixelSize: { width: 0, height: 0 }, center: boundsCenter },
     NumberCalc
   );
 
   const viewportController = new ViewportController(NumberCalc, viewport);
+  viewportController.setBounds(MANDELBROT_BOUNDS);
+
   const isDirty = new DirtyFlag(false);
 
-  const initialCenter = { x: viewport.center.x, y: viewport.center.y };
-  const initialZoom = viewport.zoom2Exp;
+  let initialCenter = { ...boundsCenter };
+  let initialZoom = viewport.zoom2Exp;
 
   let zoomAnimation: {
     startTime: number;
@@ -108,6 +114,8 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     }
   };
 
+  let initialStateSet = false;
+
   const resizeCanvas = () => {
     const DPR = window.devicePixelRatio || 1;
     const width = Math.round(wrapperRef.clientWidth * DPR);
@@ -117,6 +125,13 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     canvasRef.height = height;
 
     viewportController.resize(width, height);
+
+    if (!initialStateSet) {
+      viewportController.resetToInitialView();
+      initialCenter = { x: viewport.center.x, y: viewport.center.y };
+      initialZoom = viewport.zoom2Exp;
+      initialStateSet = true;
+    }
 
     canvasRef.style.width = `${wrapperRef.clientWidth}px`;
     canvasRef.style.height = `${wrapperRef.clientHeight}px`;
@@ -205,6 +220,7 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     viewport.center = { x: initialCenter.x, y: initialCenter.y };
     viewport.zoom2Exp = initialZoom;
     zoomAnimation = null;
+    viewportController.moveByUnits({ x: 0, y: 0 });
     redraw();
   };
 

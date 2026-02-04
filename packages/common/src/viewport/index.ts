@@ -1,2 +1,6 @@
 export { Viewport, type ViewportRect } from "./Viewport";
-export { ViewportController } from "./ViewportController";
+export {
+  MANDELBROT_BOUNDS,
+  type PlaneBounds,
+  ViewportController,
+} from "./ViewportController";
