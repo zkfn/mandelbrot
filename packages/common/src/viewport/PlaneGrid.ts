@@ -30,14 +30,13 @@ export const computeGridLinesFactory = <T>(calc: Calc<T>): GridLinesCalc<T> => {
     const minGapPlane = calc.multNum(gapPixels, calc.inv2Exp(Math.floor(zoom2Exp)));
 
     const widthStepsPlane = calc.zeroAlignedSteps(minGapPlane, topleft.x, bottomright.x);
-
-    const heightStepsPlane = calc.zeroAlignedSteps(minGapPlane, topleft.y, bottomright.y);
+    const heightStepsPlane = calc.zeroAlignedSteps(minGapPlane, bottomright.y, topleft.y);
 
     const widthPlaneToPx = (planeW: T) =>
       calc.mult2ExpShouldBeInt(zoom2Exp, calc.sub(planeW, topleft.x));
 
     const heightPlaneToPx = (planeH: T) =>
-      calc.mult2ExpShouldBeInt(zoom2Exp, calc.sub(planeH, topleft.y));
+      -calc.mult2ExpShouldBeInt(zoom2Exp, calc.sub(planeH, topleft.y));
 
     const verticalLines = widthStepsPlane.map((step): GridLine => {
       const x = widthPlaneToPx(step);

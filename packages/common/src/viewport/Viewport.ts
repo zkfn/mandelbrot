@@ -45,12 +45,12 @@ export class Viewport<T> implements ViewportRect<T> {
 
     const topleft: Vec2<T> = {
       x: this.calc.sub(this.center.x, halfWidth),
-      y: this.calc.sub(this.center.y, halfHeight),
+      y: this.calc.add(this.center.y, halfHeight),
     };
 
     const bottomright: Vec2<T> = {
       x: this.calc.add(this.center.x, halfWidth),
-      y: this.calc.add(this.center.y, halfHeight),
+      y: this.calc.sub(this.center.y, halfHeight),
     };
 
     return { topleft, bottomright };
@@ -61,7 +61,7 @@ export class Viewport<T> implements ViewportRect<T> {
 
     const centerOffsetPx = {
       x: pixelPos.x - this.pixelSize.width / 2,
-      y: pixelPos.y - this.pixelSize.height / 2,
+      y: -(pixelPos.y - this.pixelSize.height / 2),
     };
 
     return {
@@ -78,7 +78,7 @@ export class Viewport<T> implements ViewportRect<T> {
 
     return {
       x: this.calc.mult2ExpShouldBeInt(this.zoom2Exp, offsetPlane.x) + this.pixelSize.width / 2,
-      y: this.calc.mult2ExpShouldBeInt(this.zoom2Exp, offsetPlane.y) + this.pixelSize.height / 2,
+      y: -this.calc.mult2ExpShouldBeInt(this.zoom2Exp, offsetPlane.y) + this.pixelSize.height / 2, // Y inverted
     };
   }
 

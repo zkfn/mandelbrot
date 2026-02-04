@@ -15,7 +15,7 @@ export class ViewportController<T> {
 
     this.moveByUnits({
       x: this.calc.multNum(offsetX, upp),
-      y: this.calc.multNum(offsetY, upp),
+      y: this.calc.multNum(-offsetY, upp),
     });
   }
 
@@ -39,7 +39,7 @@ export class ViewportController<T> {
 
     const centerOffsetPx = {
       x: focusPointPx.x - this.rect.pixelSize.width / 2,
-      y: focusPointPx.y - this.rect.pixelSize.height / 2,
+      y: -(focusPointPx.y - this.rect.pixelSize.height / 2),
     };
 
     // This point needs to remain mapped to the same pixel after the zoom
