@@ -224,15 +224,28 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     redraw();
   };
 
+  const clientToCanvas = (x: number, y: number) => {
+    return {
+      x: (x - canvasRef.clientLeft) * window.devicePixelRatio,
+      y: (y - canvasRef.clientTop) * window.devicePixelRatio,
+    };
+  };
+
+  const computeTooltipLabels = (x: number, y: number) => {
+    return viewportController.pixelToPlane(clientToCanvas(x, y));
+  };
+
+  const updateTooltipLabels = (x: number, y: number) => {
+    const { x: planeX, y: planeY } = computeTooltipLabels(x, y);
+    setTooltip((prev) => ({ ...prev, planeX, planeY }));
+  };
+
   const pointerEvents = createPointerEvents({
     canvas: canvasRef,
 
     onZoom: (by, mx, my) => {
-      viewportController.zoomByAtPixels(by, {
-        x: (mx - canvasRef.clientLeft) * window.devicePixelRatio,
-        y: (my - canvasRef.clientTop) * window.devicePixelRatio,
-      });
-
+      viewportController.zoomByAtPixels(by, clientToCanvas(mx, my));
+      updateTooltipLabels(mx, my);
       isDirty.setDirty();
     },
 
@@ -252,18 +265,14 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
 
       const x = xPx - rect.left;
       const y = yPx - rect.top;
-      const dpr = window.devicePixelRatio || 1;
 
-      const planeCoords = viewportController.pixelToPlane({
-        x: x * dpr,
-        y: y * dpr,
-      });
+      const { x: planeX, y: planeY } = computeTooltipLabels(x, y);
 
       setTooltip({
         x,
         y,
-        planeX: planeCoords.x,
-        planeY: planeCoords.y,
+        planeX,
+        planeY,
         visible: true,
         containerWidth: wrapperRef.clientWidth,
         containerHeight: wrapperRef.clientHeight,
