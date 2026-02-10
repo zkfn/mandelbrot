@@ -3,48 +3,35 @@ import type { PlaneBounds } from "./limits";
 import { MAX_ZOOM2EXP, POSITION_CLAMP_EPSILON } from "./limits";
 import type { Viewport } from "./Viewport";
 
+const DEFAULT_ZOOM = 10;
+
 export class ViewportController<T> {
   private calc: Calc<T>;
   private viewport: Viewport<T>;
-  private planeBounds: PlaneBounds | null = null;
-  private minZoom2Exp: number | null = null;
+  private planeBounds: PlaneBounds;
+  private minZoom2Exp: number;
 
-  public constructor(calc: Calc<T>, rect: Viewport<T>) {
+  public constructor(calc: Calc<T>, viewport: Viewport<T>, bounds: PlaneBounds) {
     this.calc = calc;
-    this.viewport = rect;
-  }
-
-  public setBounds(bounds: PlaneBounds): void {
+    this.viewport = viewport;
     this.planeBounds = bounds;
+    this.minZoom2Exp = DEFAULT_ZOOM;
+
     this.updateMinZoom();
     this.clampZoom();
     this.clampPosition();
   }
 
   public resetToInitialView(): void {
-    if (this.minZoom2Exp !== null) {
-      this.viewport.zoom2Exp = this.minZoom2Exp;
-    }
-    if (this.planeBounds) {
-      this.viewport.center = {
-        x: this.fromNumber((this.planeBounds.minX + this.planeBounds.maxX) / 2),
-        y: this.fromNumber((this.planeBounds.minY + this.planeBounds.maxY) / 2),
-      };
-    }
+    this.viewport.zoom2Exp = this.minZoom2Exp;
     this.clampPosition();
   }
 
   public getZoomLevel(): number {
-    if (this.minZoom2Exp === null) {
-      return 1;
-    }
-    return 2 ** (this.viewport.zoom2Exp - this.minZoom2Exp);
+    return 2 ** this.getZoomExponent();
   }
 
   public getZoomExponent(): number {
-    if (this.minZoom2Exp === null) {
-      return 0;
-    }
     return this.viewport.zoom2Exp - this.minZoom2Exp;
   }
 
@@ -91,8 +78,8 @@ export class ViewportController<T> {
     };
 
     const newZoom2Exp = this.viewport.zoom2Exp - deltaZoom2Exp;
-    let clampedZoom =
-      this.minZoom2Exp !== null ? Math.max(newZoom2Exp, this.minZoom2Exp) : newZoom2Exp;
+    let clampedZoom = Math.max(newZoom2Exp, this.minZoom2Exp);
+
     clampedZoom = Math.min(clampedZoom, MAX_ZOOM2EXP);
     const uppAfter = this.calc.inv2Exp(clampedZoom);
 
@@ -119,14 +106,10 @@ export class ViewportController<T> {
   }
 
   private updateMinZoom(): void {
-    if (!this.planeBounds) {
-      this.minZoom2Exp = null;
-      return;
-    }
-
     const { width, height } = this.viewport.pixelSize;
+
     if (width === 0 || height === 0) {
-      this.minZoom2Exp = null;
+      this.minZoom2Exp = DEFAULT_ZOOM;
       return;
     }
 
@@ -140,7 +123,7 @@ export class ViewportController<T> {
   }
 
   private clampZoom(): void {
-    if (this.minZoom2Exp !== null && this.viewport.zoom2Exp < this.minZoom2Exp) {
+    if (this.viewport.zoom2Exp < this.minZoom2Exp) {
       this.viewport.zoom2Exp = this.minZoom2Exp;
     }
     if (this.viewport.zoom2Exp > MAX_ZOOM2EXP) {
@@ -149,8 +132,6 @@ export class ViewportController<T> {
   }
 
   private clampPosition(): void {
-    if (!this.planeBounds) return;
-
     const viewBounds = this.viewport.getBounds();
     const viewMinX = this.toNumber(viewBounds.topleft.x);
     const viewMaxX = this.toNumber(viewBounds.bottomright.x);

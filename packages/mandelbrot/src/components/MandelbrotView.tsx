@@ -25,8 +25,7 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     NumberCalc
   );
 
-  const viewportController = new ViewportController(NumberCalc, viewport);
-  viewportController.setBounds(MANDELBROT_BOUNDS);
+  const viewportController = new ViewportController(NumberCalc, viewport, MANDELBROT_BOUNDS);
 
   const isDirty = new DirtyFlag(false);
 
