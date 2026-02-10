@@ -1,19 +1,7 @@
 import type { Calc, RectPoints, Vec2 } from "../numeric";
+import type { PlaneBounds } from "./limits";
+import { MAX_ZOOM2EXP, POSITION_CLAMP_EPSILON } from "./limits";
 import type { Viewport } from "./Viewport";
-
-export interface PlaneBounds {
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-}
-
-export const MANDELBROT_BOUNDS: PlaneBounds = {
-  minX: -2.5,
-  maxX: 1.0,
-  minY: -1.5,
-  maxY: 1.5,
-};
 
 export class ViewportController<T> {
   private calc: Calc<T>;
@@ -44,6 +32,20 @@ export class ViewportController<T> {
       };
     }
     this.clampPosition();
+  }
+
+  public getZoomLevel(): number {
+    if (this.minZoom2Exp === null) {
+      return 1;
+    }
+    return 2 ** (this.rect.zoom2Exp - this.minZoom2Exp);
+  }
+
+  public getZoomExponent(): number {
+    if (this.minZoom2Exp === null) {
+      return 0;
+    }
+    return this.rect.zoom2Exp - this.minZoom2Exp;
   }
 
   public moveByPixels({ x: offsetX, y: offsetY }: Vec2<number>) {
@@ -89,8 +91,9 @@ export class ViewportController<T> {
     };
 
     const newZoom2Exp = this.rect.zoom2Exp - deltaZoom2Exp;
-    const clampedZoom =
+    let clampedZoom =
       this.minZoom2Exp !== null ? Math.max(newZoom2Exp, this.minZoom2Exp) : newZoom2Exp;
+    clampedZoom = Math.min(clampedZoom, MAX_ZOOM2EXP);
     const uppAfter = this.calc.inv2Exp(clampedZoom);
 
     const centerOffsetPlaneAfter = {
@@ -140,6 +143,9 @@ export class ViewportController<T> {
     if (this.minZoom2Exp !== null && this.rect.zoom2Exp < this.minZoom2Exp) {
       this.rect.zoom2Exp = this.minZoom2Exp;
     }
+    if (this.rect.zoom2Exp > MAX_ZOOM2EXP) {
+      this.rect.zoom2Exp = MAX_ZOOM2EXP;
+    }
   }
 
   private clampPosition(): void {
@@ -180,7 +186,7 @@ export class ViewportController<T> {
     const dx = newMinX - viewMinX;
     const dy = newMinY - viewMinY;
 
-    if (Math.abs(dx) > 1e-10 || Math.abs(dy) > 1e-10) {
+    if (Math.abs(dx) > POSITION_CLAMP_EPSILON || Math.abs(dy) > POSITION_CLAMP_EPSILON) {
       this.rect.center = {
         x: this.calc.add(this.rect.center.x, this.fromNumber(dx)),
         y: this.calc.add(this.rect.center.y, this.fromNumber(dy)),

@@ -55,6 +55,8 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     showGridlines: true,
   });
 
+  const [zoomExponent, setZoomExponent] = createSignal(0);
+
   const redraw = () => {
     const ctx = canvasRef.getContext("2d");
 
@@ -133,6 +135,8 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
       initialStateSet = true;
     }
 
+    setZoomExponent(viewportController.getZoomExponent());
+
     canvasRef.style.width = `${wrapperRef.clientWidth}px`;
     canvasRef.style.height = `${wrapperRef.clientHeight}px`;
 
@@ -163,6 +167,7 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
 
     if (Math.abs(zoomDelta) > 0.001) {
       viewportController.zoomByAtPixels(zoomDelta, centerPx);
+      setZoomExponent(viewportController.getZoomExponent());
       isDirty.setDirty();
     }
 
@@ -221,6 +226,7 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     viewport.zoom2Exp = initialZoom;
     zoomAnimation = null;
     viewportController.moveByUnits({ x: 0, y: 0 });
+    setZoomExponent(viewportController.getZoomExponent());
     redraw();
   };
 
@@ -246,6 +252,7 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     onZoom: (by, mx, my) => {
       viewportController.zoomByAtPixels(by, clientToCanvas(mx, my));
       updateTooltipLabels(mx, my);
+      setZoomExponent(viewportController.getZoomExponent());
       isDirty.setDirty();
     },
 
@@ -295,6 +302,7 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
       <Controls
         state={controls}
         setState={setControls}
+        zoomExponent={zoomExponent}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onReset={handleReset}

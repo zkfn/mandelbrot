@@ -9,6 +9,7 @@ export type ControlsState = {
 type ControlsProps = {
   state: Accessor<ControlsState>;
   setState: Setter<ControlsState>;
+  zoomExponent: Accessor<number>;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onReset: () => void;
@@ -18,9 +19,18 @@ type ControlsProps = {
 const Controls = (props: ControlsProps) => {
   const toggle = (key: keyof ControlsState) => {
     props.setState((prev) => ({ ...prev, [key]: !prev[key] }));
-    // Notify parent that display settings changed (for gridlines/labels)
+
     if (key !== "showTooltip") {
       props.onDisplayChange?.();
+    }
+  };
+
+  const zoomDisplay = (): string => {
+    const exponent = props.zoomExponent();
+    if (exponent <= 8) {
+      return String(Math.round(2 ** exponent));
+    } else {
+      return `2^${Math.round(exponent)}`;
     }
   };
 
@@ -36,6 +46,7 @@ const Controls = (props: ControlsProps) => {
         <button type="button" onClick={props.onReset}>
           Reset
         </button>
+        <span class="zoom-level">Zoom: {zoomDisplay()}x</span>
       </div>
 
       <div class="controls-group">
