@@ -5,13 +5,13 @@ import type { Viewport } from "./Viewport";
 
 export class ViewportController<T> {
   private calc: Calc<T>;
-  private rect: Viewport<T>;
+  private viewport: Viewport<T>;
   private planeBounds: PlaneBounds | null = null;
   private minZoom2Exp: number | null = null;
 
   public constructor(calc: Calc<T>, rect: Viewport<T>) {
     this.calc = calc;
-    this.rect = rect;
+    this.viewport = rect;
   }
 
   public setBounds(bounds: PlaneBounds): void {
@@ -23,10 +23,10 @@ export class ViewportController<T> {
 
   public resetToInitialView(): void {
     if (this.minZoom2Exp !== null) {
-      this.rect.zoom2Exp = this.minZoom2Exp;
+      this.viewport.zoom2Exp = this.minZoom2Exp;
     }
     if (this.planeBounds) {
-      this.rect.center = {
+      this.viewport.center = {
         x: this.fromNumber((this.planeBounds.minX + this.planeBounds.maxX) / 2),
         y: this.fromNumber((this.planeBounds.minY + this.planeBounds.maxY) / 2),
       };
@@ -38,18 +38,18 @@ export class ViewportController<T> {
     if (this.minZoom2Exp === null) {
       return 1;
     }
-    return 2 ** (this.rect.zoom2Exp - this.minZoom2Exp);
+    return 2 ** (this.viewport.zoom2Exp - this.minZoom2Exp);
   }
 
   public getZoomExponent(): number {
     if (this.minZoom2Exp === null) {
       return 0;
     }
-    return this.rect.zoom2Exp - this.minZoom2Exp;
+    return this.viewport.zoom2Exp - this.minZoom2Exp;
   }
 
   public moveByPixels({ x: offsetX, y: offsetY }: Vec2<number>) {
-    const upp = this.rect.getUnitsPerPixel();
+    const upp = this.viewport.getUnitsPerPixel();
 
     this.moveByUnits({
       x: this.calc.multNum(offsetX, upp),
@@ -59,9 +59,9 @@ export class ViewportController<T> {
 
   public moveByUnits(offset: Vec2<T>) {
     const { x: offX, y: offY } = offset;
-    const { x, y } = this.rect.center;
+    const { x, y } = this.viewport.center;
 
-    this.rect.center = {
+    this.viewport.center = {
       x: this.calc.add(x, offX),
       y: this.calc.add(y, offY),
     };
@@ -70,27 +70,27 @@ export class ViewportController<T> {
   }
 
   public resize(width: number, height: number): void {
-    this.rect.pixelSize.width = width;
-    this.rect.pixelSize.height = height;
+    this.viewport.pixelSize.width = width;
+    this.viewport.pixelSize.height = height;
     this.updateMinZoom();
     this.clampZoom();
     this.clampPosition();
   }
 
   public zoomByAtPixels(deltaZoom2Exp: number, focusPointPx: Vec2<number>) {
-    const uppBefore = this.rect.getUnitsPerPixel();
+    const uppBefore = this.viewport.getUnitsPerPixel();
 
     const centerOffsetPx = {
-      x: focusPointPx.x - this.rect.pixelSize.width / 2,
-      y: -(focusPointPx.y - this.rect.pixelSize.height / 2),
+      x: focusPointPx.x - this.viewport.pixelSize.width / 2,
+      y: -(focusPointPx.y - this.viewport.pixelSize.height / 2),
     };
 
     const focusPointPlane = {
-      x: this.calc.add(this.calc.multNum(centerOffsetPx.x, uppBefore), this.rect.center.x),
-      y: this.calc.add(this.calc.multNum(centerOffsetPx.y, uppBefore), this.rect.center.y),
+      x: this.calc.add(this.calc.multNum(centerOffsetPx.x, uppBefore), this.viewport.center.x),
+      y: this.calc.add(this.calc.multNum(centerOffsetPx.y, uppBefore), this.viewport.center.y),
     };
 
-    const newZoom2Exp = this.rect.zoom2Exp - deltaZoom2Exp;
+    const newZoom2Exp = this.viewport.zoom2Exp - deltaZoom2Exp;
     let clampedZoom =
       this.minZoom2Exp !== null ? Math.max(newZoom2Exp, this.minZoom2Exp) : newZoom2Exp;
     clampedZoom = Math.min(clampedZoom, MAX_ZOOM2EXP);
@@ -101,8 +101,8 @@ export class ViewportController<T> {
       y: this.calc.multNum(centerOffsetPx.y, uppAfter),
     };
 
-    this.rect.zoom2Exp = clampedZoom;
-    this.rect.center = {
+    this.viewport.zoom2Exp = clampedZoom;
+    this.viewport.center = {
       x: this.calc.sub(focusPointPlane.x, centerOffsetPlaneAfter.x),
       y: this.calc.sub(focusPointPlane.y, centerOffsetPlaneAfter.y),
     };
@@ -111,11 +111,11 @@ export class ViewportController<T> {
   }
 
   public pixelToPlane(pixelPos: Vec2<number>): Vec2<T> {
-    return this.rect.pixelToPlane(pixelPos);
+    return this.viewport.pixelToPlane(pixelPos);
   }
 
   public getBounds(): RectPoints<T> {
-    return this.rect.getBounds();
+    return this.viewport.getBounds();
   }
 
   private updateMinZoom(): void {
@@ -124,7 +124,7 @@ export class ViewportController<T> {
       return;
     }
 
-    const { width, height } = this.rect.pixelSize;
+    const { width, height } = this.viewport.pixelSize;
     if (width === 0 || height === 0) {
       this.minZoom2Exp = null;
       return;
@@ -140,18 +140,18 @@ export class ViewportController<T> {
   }
 
   private clampZoom(): void {
-    if (this.minZoom2Exp !== null && this.rect.zoom2Exp < this.minZoom2Exp) {
-      this.rect.zoom2Exp = this.minZoom2Exp;
+    if (this.minZoom2Exp !== null && this.viewport.zoom2Exp < this.minZoom2Exp) {
+      this.viewport.zoom2Exp = this.minZoom2Exp;
     }
-    if (this.rect.zoom2Exp > MAX_ZOOM2EXP) {
-      this.rect.zoom2Exp = MAX_ZOOM2EXP;
+    if (this.viewport.zoom2Exp > MAX_ZOOM2EXP) {
+      this.viewport.zoom2Exp = MAX_ZOOM2EXP;
     }
   }
 
   private clampPosition(): void {
     if (!this.planeBounds) return;
 
-    const viewBounds = this.rect.getBounds();
+    const viewBounds = this.viewport.getBounds();
     const viewMinX = this.toNumber(viewBounds.topleft.x);
     const viewMaxX = this.toNumber(viewBounds.bottomright.x);
     const viewMinY = this.toNumber(viewBounds.bottomright.y);
@@ -187,9 +187,9 @@ export class ViewportController<T> {
     const dy = newMinY - viewMinY;
 
     if (Math.abs(dx) > POSITION_CLAMP_EPSILON || Math.abs(dy) > POSITION_CLAMP_EPSILON) {
-      this.rect.center = {
-        x: this.calc.add(this.rect.center.x, this.fromNumber(dx)),
-        y: this.calc.add(this.rect.center.y, this.fromNumber(dy)),
+      this.viewport.center = {
+        x: this.calc.add(this.viewport.center.x, this.fromNumber(dx)),
+        y: this.calc.add(this.viewport.center.y, this.fromNumber(dy)),
       };
     }
   }
