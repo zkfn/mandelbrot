@@ -192,6 +192,7 @@ const MandelbrotView = (props: MandelbrotViewProps) => {
     };
 
     raf = requestAnimationFrame(loop);
+    requestAnimationFrame(resizeCanvas);
 
     const cancelEvents = createCanvasEvents(wrapperRef, resizeCanvas);
     const cancelRaf = () => cancelAnimationFrame(raf);
